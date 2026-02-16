@@ -13,6 +13,23 @@ The system translates complex nutritional inputs into actionable, contextual rec
 
 ---
 
+## 📸 Screenshots
+
+### Dashboard
+![Dashboard](assets/Dashboard.png)
+
+---
+
+### Food Log
+![Food Log](assets/Foodlog.png)
+
+---
+
+### Micronutrient Score
+![Micronutrient Score](assets/Microscore.png)
+
+---
+
 ## 🧠 Core Features
 
 - Daily micronutrient scoring engine (MicroScore algorithm)
