@@ -44,6 +44,37 @@ const App: React.FC = () => {
   const [gamification, setGamification] = useState<GamificationState>(initialGamification);
   const [foodLogs, setFoodLogs] = useState<MealLog[]>([]);
 
+  useEffect(() => {
+    const savedData = localStorage.getItem('vitalQuestData');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.profile && parsed.metrics && parsed.plan) {
+          setProfile(parsed.profile);
+          setMetrics(parsed.metrics);
+          setPlan(parsed.plan);
+          setGamification(parsed.gamification || initialGamification);
+          setFoodLogs(parsed.foodLogs || []);
+          setView('dashboard');
+        }
+      } catch (e) {
+        console.error('Failed to parse saved data', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (profile && metrics && plan) {
+      localStorage.setItem('vitalQuestData', JSON.stringify({
+        profile,
+        metrics,
+        plan,
+        gamification,
+        foodLogs
+      }));
+    }
+  }, [profile, metrics, plan, gamification, foodLogs]);
+
   const handleOnboardingComplete = async (userProfile: UserProfile) => {
     setIsLoading(true);
     try {
@@ -77,16 +108,26 @@ const App: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (window.confirm("Start over? All data will be cleared.")) {
-      setProfile(null);
-      setMetrics(null);
-      setPlan(null);
-      setFoodLogs([]);
-      setGamification(initialGamification);
-      setView('onboarding');
-      window.location.reload();
-    }
+    localStorage.removeItem('vitalQuestData');
+    setProfile(null);
+    setMetrics(null);
+    setPlan(null);
+    setFoodLogs([]);
+    setGamification(initialGamification);
+    setView('onboarding');
+    window.location.reload();
   };
+
+  const handleResetTodayLog = () => {
+    const today = new Date().toDateString();
+    setFoodLogs(prev => prev.filter(log => {
+      if (!log.timestamp) return false; // Clear logs from older versions without timestamps
+      return new Date(log.timestamp).toDateString() !== today;
+    }));
+  };
+
+  const today = new Date().toDateString();
+  const todayLogs = foodLogs.filter(log => log.timestamp && new Date(log.timestamp).toDateString() === today);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -107,7 +148,8 @@ const App: React.FC = () => {
             <Dashboard 
               profile={profile} metrics={metrics} plan={plan} gamification={gamification} 
               onUpdateGamification={setGamification} onReset={handleReset} 
-              foodLogs={foodLogs} onAddFood={handleAddFood} onUpdateLog={()=>{}} onDeleteLog={handleDeleteLog} 
+              foodLogs={todayLogs} onAddFood={handleAddFood} onUpdateLog={()=>{}} onDeleteLog={handleDeleteLog} 
+              onResetTodayLog={handleResetTodayLog}
             />
           )
         )}
