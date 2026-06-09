@@ -82,6 +82,7 @@ const [favMealType, setFavMealType] = useState<MealType>('Breakfast');
 // Water goal: 35 ml/kg capped at 3500 ml
 const waterGoalMl = Math.min(Math.round(profile.weightKg * 35), 3500);
 const waterPct = Math.min(Math.round((waterLog.mlConsumed / waterGoalMl) * 100), 100);
+const isViewingToday = selectedDate === toISODateString();
 
   // Export state
   const reportRef = useRef<HTMLDivElement>(null);
@@ -333,29 +334,47 @@ const waterPct = Math.min(Math.round((waterLog.mlConsumed / waterGoalMl) * 100),
                 </div>
               </div>
 
-              {/* Water progress bar */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-blue-700 text-sm">💧 Water Today</span>
-                  <span className="text-sm font-bold text-slate-600">{waterLog.mlConsumed} / {waterGoalMl} ml <span className="text-slate-400 font-normal">({waterPct}%)</span></span>
-                </div>
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
-                  <div className="h-full bg-blue-400 transition-all duration-500 rounded-full" style={{ width: `${waterPct}%` }} />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => onLogWater(250)} className="flex-1 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors">+250 ml</button>
-                  <button onClick={() => onLogWater(500)} className="flex-1 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors">+500 ml</button>
-                  <button onClick={() => setIsAddingWater(true)} className="flex-1 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors">Custom</button>
-                  {waterLog.mlConsumed > 0 && (
-                    <button onClick={onResetWater} className="py-1.5 px-2 text-xs font-bold bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-100 border border-slate-200 transition-colors">↺</button>
-                  )}
-                </div>
-              </div>
+              {/* Today-only trackers: water + sunlight */}
+              {isViewingToday ? (
+                <>
+                  {/* Water progress bar */}
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-blue-700 text-sm">💧 Water Today</span>
+                      <span className="text-sm font-bold text-slate-600">{waterLog.mlConsumed} / {waterGoalMl} ml <span className="text-slate-400 font-normal">({waterPct}%)</span></span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
+                      <div className="h-full bg-blue-400 transition-all duration-500 rounded-full" style={{ width: `${waterPct}%` }} />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => onLogWater(250)} className="flex-1 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors">+250 ml</button>
+                      <button onClick={() => onLogWater(500)} className="flex-1 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors">+500 ml</button>
+                      <button onClick={() => setIsAddingWater(true)} className="flex-1 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors">Custom</button>
+                      {waterLog.mlConsumed > 0 && (
+                        <button onClick={onResetWater} className="py-1.5 px-2 text-xs font-bold bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-100 border border-slate-200 transition-colors">↺</button>
+                      )}
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                  <button onClick={() => setIsAddingSunlight(true)} className="py-3 bg-amber-50 rounded-xl font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200">☀️ Sunlight</button>
-                  <button onClick={() => setIsMealBuilderOpen(true)} className="py-3 bg-indigo-50 rounded-xl font-bold text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200">✨ Builder</button>
-              </div>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <button onClick={() => setIsAddingSunlight(true)} className="py-3 bg-amber-50 rounded-xl font-bold text-amber-700 hover:bg-amber-100 transition-colors border border-amber-200">☀️ Sunlight</button>
+                    <button onClick={() => setIsMealBuilderOpen(true)} className="py-3 bg-indigo-50 rounded-xl font-bold text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200">✨ Builder</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Past-day banner */}
+                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 mb-4 text-sm text-slate-500">
+                    <span className="text-base">📅</span>
+                    <span>Viewing a past day — water &amp; sunlight tracking only available for today.</span>
+                  </div>
+
+                  {/* Meal builder still available for past-day edits */}
+                  <div className="mb-6">
+                    <button onClick={() => setIsMealBuilderOpen(true)} className="w-full py-3 bg-indigo-50 rounded-xl font-bold text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200">✨ Builder</button>
+                  </div>
+                </>
+              )}
 
               {/* Favourites quick-add */}
               {favouriteFoods.length > 0 && (
