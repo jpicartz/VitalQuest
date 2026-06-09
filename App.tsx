@@ -88,7 +88,9 @@ const App: React.FC = () => {
           const rawGami: GamificationState = parsed.gamification || initialGamification;
           const sanitisedGami: GamificationState = {
             ...rawGami,
-            completedQuestIds: rawGami.completedQuestIds.filter(id => validQuestIds.has(id)),
+            // Defensive fallbacks for users on old schema that predates these array fields
+            badges: rawGami.badges ?? [],
+            completedQuestIds: (rawGami.completedQuestIds ?? []).filter(id => validQuestIds.has(id)),
           };
 
           // Apply daily quest reset on top of the sanitised state
