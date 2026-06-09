@@ -111,6 +111,15 @@ export interface WeightEntry {
   isBaseline?: true; // Set on the onboarding entry — never overwritten by handleLogWeight
 }
 
+export interface ExerciseEntry {
+  id: string;
+  date: string;        // ISO date YYYY-MM-DD
+  type: string;        // e.g. 'Running', 'Yoga'
+  durationMin: number;
+  notes?: string;
+  xpEarned: number;
+}
+
 // --- New Types for Food Logging & Nutrition ---
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';

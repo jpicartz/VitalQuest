@@ -3,7 +3,7 @@ import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import {
   UserProfile, CalculatedMetrics, WellnessPlan, GamificationState,
-  ActivityLevel, Goal, MealLog, MealType, FoodItem, WaterLog, WeightEntry,
+  ActivityLevel, Goal, MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry,
 } from './types';
 import { generateWellnessPlan } from './services/claudeService';
 import { toISODateString, isSameISODate, timestampForISODate } from './utils/dateUtils';
@@ -66,6 +66,7 @@ const App: React.FC = () => {
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
   const [favouriteFoods, setFavouriteFoods] = useState<FoodItem[]>([]);
   const [lifetimeQuestsCompleted, setLifetimeQuestsCompleted] = useState<number>(0);
+  const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
 
   // ── Load from localStorage ────────────────────────────────────────────────
   useEffect(() => {
@@ -106,6 +107,7 @@ const App: React.FC = () => {
 
           setWeightHistory(parsed.weightHistory || []);
           setFavouriteFoods(parsed.favouriteFoods || []);
+          setExerciseLogs(parsed.exerciseLogs || []);
           setView('dashboard');
         }
       } catch (e) {
@@ -119,7 +121,7 @@ const App: React.FC = () => {
     if (profile && metrics && plan) {
       localStorage.setItem('vitalQuestData', JSON.stringify({
         profile, metrics, plan, gamification, foodLogs,
-        waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted,
+        waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs,
       }));
     }
   }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted]);
@@ -235,6 +237,35 @@ const App: React.FC = () => {
     }
   };
 
+  // ── Exercise ─────────────────────────────────────────────────────────────
+  const handleLogExercise = (type: string, durationMin: number, notes?: string) => {
+    const today = toISODateString();
+    // 5 XP per 15 min, max 30 XP per entry
+    const xpEarned = Math.min(Math.floor(durationMin / 15) * 5, 30);
+    const entry: ExerciseEntry = {
+      id: `ex-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      date: today,
+      type,
+      durationMin,
+      notes,
+      xpEarned,
+    };
+    setExerciseLogs(prev => [...prev, entry]);
+    if (xpEarned > 0) {
+      setGamification(prev => {
+        const newXp = prev.xp + xpEarned;
+        const newLevel = Math.floor(newXp / 100) + 1;
+        const updated = { ...prev, xp: newXp, level: Math.max(prev.level, newLevel) };
+        runBadgeCheck(updated, lifetimeQuestsCompleted, computeMicroScore(foodLogs, today), waterLog.mlConsumed);
+        return updated;
+      });
+    }
+  };
+
+  const handleDeleteExercise = (id: string) => {
+    setExerciseLogs(prev => prev.filter(e => e.id !== id));
+  };
+
   // ── Favourites ────────────────────────────────────────────────────────────
   const handleAddFavourite = (food: FoodItem) => {
     setFavouriteFoods(prev => {
@@ -320,6 +351,10 @@ const App: React.FC = () => {
               onAddFavourite={handleAddFavourite}
               onRemoveFavourite={handleRemoveFavourite}
               onQuickAddFavourite={handleQuickAddFavourite}
+              // Exercise
+              exerciseLogs={exerciseLogs}
+              onLogExercise={handleLogExercise}
+              onDeleteExercise={handleDeleteExercise}
             />
           )
         )}
