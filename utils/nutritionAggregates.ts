@@ -1,5 +1,42 @@
 import { MealLog } from '../types';
 import { toISODateString, isSameISODate } from './dateUtils';
+import { NUTRIENT_INFO } from '../data/nutrientData';
+
+/** Canonical priority micronutrients used for the score and snapshot bar. */
+export const PRIORITY_MICROS = [
+  'Fiber', 'Vitamin C', 'Vitamin D', 'Magnesium', 'Potassium',
+  'Iron', 'Calcium', 'Vitamin B12', 'Zinc', 'Omega-3',
+] as const;
+
+/**
+ * Compute the Micronutrient Score (0–100) for a set of food logs.
+ * If `dateISO` is provided, only logs for that calendar day are included.
+ */
+export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => {
+  const relevant = dateISO
+    ? logs.filter(l => l.timestamp && isSameISODate(l.timestamp, dateISO))
+    : logs;
+
+  const consumed: Record<string, number> = {};
+  relevant.forEach(log => {
+    if (log.food.micros) {
+      Object.entries(log.food.micros).forEach(([key, val]) => {
+        consumed[key] = (consumed[key] || 0) + Number(val || 0);
+      });
+    }
+  });
+
+  let totalRatio = 0;
+  let count = 0;
+  PRIORITY_MICROS.forEach(key => {
+    const info = NUTRIENT_INFO[key];
+    if (!info?.targetVal) return;
+    totalRatio += Math.min((consumed[key] || 0) / info.targetVal, 1);
+    count++;
+  });
+
+  return count === 0 ? 0 : Math.round((totalRatio / count) * 100);
+};
 
 export interface DailyNutritionSummary {
   label: string;

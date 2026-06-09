@@ -9,6 +9,7 @@ import { generateWellnessPlan } from './services/claudeService';
 import { toISODateString, isSameISODate, timestampForISODate } from './utils/dateUtils';
 import { updateStreak, resetQuestsIfNewDay } from './utils/streakUtils';
 import { checkBadges } from './utils/badgeUtils';
+import { computeMicroScore } from './utils/nutritionAggregates';
 
 const calculateMetrics = (profile: UserProfile): CalculatedMetrics => {
   const s = profile.gender === 'Male' ? 5 : -161;
@@ -172,7 +173,8 @@ const App: React.FC = () => {
     if (selectedDate === today) {
       setGamification(prev => {
         const updated = updateStreak(prev, today);
-        runBadgeCheck(updated, lifetimeQuestsCompleted);
+        // Pass real micro score so Nutrition Nerd badge can unlock
+        runBadgeCheck(updated, lifetimeQuestsCompleted, computeMicroScore([...foodLogs, newLog], today));
         return updated;
       });
     }
@@ -195,7 +197,7 @@ const App: React.FC = () => {
     const newLtq = lifetimeQuestsCompleted + questsCompletedDelta;
     if (questsCompletedDelta > 0) setLifetimeQuestsCompleted(newLtq);
     setGamification(newState);
-    runBadgeCheck(newState, newLtq, 0, waterLog.mlConsumed);
+    runBadgeCheck(newState, newLtq, computeMicroScore(foodLogs, toISODateString()), waterLog.mlConsumed);
   };
 
   // ── Water ─────────────────────────────────────────────────────────────────
@@ -204,9 +206,9 @@ const App: React.FC = () => {
     setWaterLog(prev => {
       const base = prev.date === today ? prev.mlConsumed : 0;
       const newMl = base + ml;
-      // Run badge check with updated water
+      // Run badge check with updated water + real micro score
       setGamification(prev2 => {
-        runBadgeCheck(prev2, lifetimeQuestsCompleted, 0, newMl);
+        runBadgeCheck(prev2, lifetimeQuestsCompleted, computeMicroScore(foodLogs, toISODateString()), newMl);
         return prev2;
       });
       return { date: today, mlConsumed: newMl };

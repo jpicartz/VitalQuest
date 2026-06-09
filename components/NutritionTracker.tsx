@@ -3,7 +3,7 @@ import { Button } from './ui/Button';
 import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
-import { getLastNDaysSummaries, getWeeklyMacroTotals } from '../utils/nutritionAggregates';
+import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
@@ -37,11 +37,6 @@ interface NutritionTrackerProps {
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-
-const PRIORITY_MICROS = [
-  "Fiber", "Vitamin C", "Vitamin D", "Magnesium", "Potassium", 
-  "Iron", "Calcium", "Vitamin B12", "Zinc", "Omega-3"
-];
 
 const rangeOptions = [7, 14, 30];
 
@@ -109,25 +104,7 @@ const waterPct = Math.min(Math.round((waterLog.mlConsumed / waterGoalMl) * 100),
     }
   });
 
-  const calculateMicroScore = () => {
-    let totalRatio = 0;
-    let count = 0;
-
-    PRIORITY_MICROS.forEach(key => {
-        const info = NUTRIENT_INFO[key];
-        if (!info || !info.targetVal) return;
-
-        const current = consumedMicros[key] || 0;
-        // Cap at 1.0 (100%)
-        const ratio = Math.min(current / info.targetVal, 1);
-        totalRatio += ratio;
-        count++;
-    });
-
-    return count === 0 ? 0 : Math.round((totalRatio / count) * 100);
-  };
-
-  const microScore = calculateMicroScore();
+  const microScore = computeMicroScore(logs, selectedDate);
 
   // Find "nailed" nutrients (>= 100% of target)
   const nailedNutrients = Object.keys(NUTRIENT_INFO)
