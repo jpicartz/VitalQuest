@@ -199,6 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           waterLog={waterLog}
           onLogWater={onLogWater}
           onResetWater={onResetWater}
+          weightHistory={weightHistory}
           favouriteFoods={favouriteFoods}
           onAddFavourite={onAddFavourite}
           onRemoveFavourite={onRemoveFavourite}

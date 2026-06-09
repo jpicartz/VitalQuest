@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Button } from './ui/Button';
-import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog } from '../types';
+import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog, WeightEntry } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
 import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, PRIORITY_MICROS } from '../utils/nutritionAggregates';
@@ -29,6 +29,8 @@ interface NutritionTrackerProps {
   waterLog: WaterLog;
   onLogWater: (ml: number) => void;
   onResetWater: () => void;
+  // Weight (for PDF export summary)
+  weightHistory: WeightEntry[];
   // Favourites
   favouriteFoods: FoodItem[];
   onAddFavourite: (food: FoodItem) => void;
@@ -43,7 +45,7 @@ const rangeOptions = [7, 14, 30];
 export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
   logs, onAddFood, onUpdateLog, onDeleteLog, targets, profile,
   onResetTodayLog, selectedDate, onSelectDate, allFoodLogs, plan,
-  waterLog, onLogWater, onResetWater,
+  waterLog, onLogWater, onResetWater, weightHistory,
   favouriteFoods, onAddFavourite, onRemoveFavourite, onQuickAddFavourite,
 }) => {
   const [activeTab, setActiveTab] = useState<'log' | 'trends' | 'analysis'>('log');
@@ -567,6 +569,43 @@ const isViewingToday = selectedDate === toISODateString();
             </Button>
           </div>
           <div ref={reportRef} className="space-y-8">
+
+           {/* ── Daily Summary (water + weight) — included in PDF export ── */}
+           <section className="bg-white p-6 rounded-3xl border shadow-sm">
+             <h3 className="text-lg font-bold mb-4">Daily Summary</h3>
+             <div className="grid grid-cols-2 gap-4">
+               {/* Water */}
+               <div className="bg-blue-50 rounded-2xl p-4">
+                 <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">💧 Water</p>
+                 <p className="text-2xl font-black text-blue-700">{waterLog.mlConsumed} <span className="text-sm font-normal text-blue-400">/ {Math.min(Math.round(profile.weightKg * 35), 3500)} ml</span></p>
+                 <div className="h-1.5 bg-blue-100 rounded-full mt-2 overflow-hidden">
+                   <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(Math.round((waterLog.mlConsumed / Math.min(Math.round(profile.weightKg * 35), 3500)) * 100), 100)}%` }} />
+                 </div>
+               </div>
+               {/* Weight */}
+               <div className="bg-slate-50 rounded-2xl p-4">
+                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">⚖️ Weight</p>
+                 {weightHistory.length > 0 ? (
+                   <>
+                     <p className="text-2xl font-black text-slate-700">{weightHistory[weightHistory.length - 1].kg} <span className="text-sm font-normal text-slate-400">kg</span></p>
+                     {weightHistory.length > 1 && (() => {
+                       const baseline = (weightHistory.find(e => e.isBaseline) ?? weightHistory[0]).kg;
+                       const current = weightHistory[weightHistory.length - 1].kg;
+                       const delta = +(current - baseline).toFixed(1);
+                       return (
+                         <p className={`text-xs font-bold mt-1 ${delta < 0 ? 'text-green-600' : delta > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                           {delta > 0 ? '+' : ''}{delta} kg from start
+                         </p>
+                       );
+                     })()}
+                   </>
+                 ) : (
+                   <p className="text-sm text-slate-400 italic mt-1">Not logged yet</p>
+                 )}
+               </div>
+             </div>
+           </section>
+
            <section className="p-6 rounded-3xl text-white shadow-lg" style={{background: 'linear-gradient(135deg, #22c55e, #15803d)'}}>
              <div className="flex justify-between items-center mb-4">
                 <div><h3 className="text-xl font-bold">Micronutrient Score</h3></div>
