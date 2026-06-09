@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 import { RecipeModal } from './RecipeModal';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface NutritionTrackerProps {
   logs: MealLog[];
@@ -605,6 +606,66 @@ const isViewingToday = selectedDate === toISODateString();
                </div>
              </div>
            </section>
+
+           {/* ── Macro donut chart ── */}
+           {(() => {
+             const proteinKcal = Math.round(consumedMacros.protein * 4);
+             const carbsKcal   = Math.round(consumedMacros.carbs * 4);
+             const fatKcal     = Math.round(consumedMacros.fat * 9);
+             const totalKcal   = proteinKcal + carbsKcal + fatKcal;
+             const COLORS = ['#3b82f6', '#f59e0b', '#f43f5e'];
+             const macroSlices = [
+               { name: 'Protein',  kcal: proteinKcal, grams: Math.round(consumedMacros.protein), color: COLORS[0] },
+               { name: 'Carbs',    kcal: carbsKcal,   grams: Math.round(consumedMacros.carbs),   color: COLORS[1] },
+               { name: 'Fat',      kcal: fatKcal,     grams: Math.round(consumedMacros.fat),     color: COLORS[2] },
+             ];
+             const hasData = totalKcal > 0;
+             return (
+               <section className="bg-white p-6 rounded-3xl border shadow-sm">
+                 <h3 className="text-lg font-bold mb-4">Calorie Breakdown</h3>
+                 {hasData ? (
+                   <div className="flex flex-col sm:flex-row items-center gap-6">
+                     <div className="relative w-44 h-44 shrink-0">
+                       <ResponsiveContainer width="100%" height="100%">
+                         <PieChart>
+                           <Pie data={macroSlices.filter(s => s.kcal > 0)} dataKey="kcal"
+                             cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={3} startAngle={90} endAngle={-270}>
+                             {macroSlices.filter(s => s.kcal > 0).map(s => (
+                               <Cell key={s.name} fill={s.color} stroke="none" />
+                             ))}
+                           </Pie>
+                           <Tooltip formatter={(v: number) => [`${v} kcal`]} />
+                         </PieChart>
+                       </ResponsiveContainer>
+                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                         <span className="text-2xl font-black text-slate-800">{totalKcal}</span>
+                         <span className="text-xs text-slate-400 font-medium">kcal</span>
+                       </div>
+                     </div>
+                     <div className="flex flex-col gap-3 flex-1 w-full">
+                       {macroSlices.map(s => (
+                         <div key={s.name} className="flex items-center gap-3">
+                           <div className="w-3 h-3 rounded-full shrink-0" style={{ background: s.color }} />
+                           <span className="text-sm font-semibold text-slate-700 w-16">{s.name}</span>
+                           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                             <div className="h-full rounded-full transition-all duration-500"
+                               style={{ width: `${totalKcal > 0 ? Math.round((s.kcal / totalKcal) * 100) : 0}%`, background: s.color }} />
+                           </div>
+                           <span className="text-sm font-bold text-slate-600 w-12 text-right">{s.grams}g</span>
+                           <span className="text-xs text-slate-400 w-8 text-right">{totalKcal > 0 ? Math.round((s.kcal / totalKcal) * 100) : 0}%</span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 ) : (
+                   <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                     <span className="text-4xl mb-2">🍽️</span>
+                     <p className="text-sm font-medium">Log food to see your macro breakdown</p>
+                   </div>
+                 )}
+               </section>
+             );
+           })()}
 
            <section className="p-6 rounded-3xl text-white shadow-lg" style={{background: 'linear-gradient(135deg, #22c55e, #15803d)'}}>
              <div className="flex justify-between items-center mb-4">
