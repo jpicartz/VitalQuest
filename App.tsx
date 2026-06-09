@@ -149,8 +149,8 @@ const App: React.FC = () => {
       setMetrics(calculated);
       setPlan(generatedPlan);
       setGamification(freshGami);
-      // Seed weight history with onboarding weight
-      setWeightHistory([{ date: today, kg: userProfile.weightKg }]);
+      // Seed weight history with onboarding weight, marked as the immutable baseline
+      setWeightHistory([{ date: today, kg: userProfile.weightKg, isBaseline: true }]);
       setView('dashboard');
     } catch {
       alert('Failed to generate plan. Please check API Key.');
@@ -225,8 +225,8 @@ const App: React.FC = () => {
   const handleLogWeight = (kg: number) => {
     const today = toISODateString();
     setWeightHistory(prev => {
-      // Replace today's entry if exists, otherwise append
-      const filtered = prev.filter(e => e.date !== today);
+      // Keep the baseline entry intact; replace any other same-day entry
+      const filtered = prev.filter(e => e.isBaseline || e.date !== today);
       return [...filtered, { date: today, kg }].sort((a, b) => a.date.localeCompare(b.date));
     });
     // Update profile's current weight too

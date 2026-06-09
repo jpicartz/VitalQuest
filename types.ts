@@ -106,8 +106,9 @@ export interface WaterLog {
 }
 
 export interface WeightEntry {
-  date: string; // ISO date YYYY-MM-DD
+  date: string;      // ISO date YYYY-MM-DD
   kg: number;
+  isBaseline?: true; // Set on the onboarding entry — never overwritten by handleLogWeight
 }
 
 // --- New Types for Food Logging & Nutrition ---

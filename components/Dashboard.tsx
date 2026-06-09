@@ -96,7 +96,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }));
   }, [weightHistory]);
 
-  const startingWeight = weightHistory.length > 0 ? weightHistory[0].kg : profile.weightKg;
+  // Prefer the tagged baseline entry; fall back to first entry, then profile weight
+  const startingWeight = (weightHistory.find(e => e.isBaseline) ?? weightHistory[0])?.kg ?? profile.weightKg;
   const currentWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].kg : profile.weightKg;
   const weightDelta = +(currentWeight - startingWeight).toFixed(1);
 
