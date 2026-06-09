@@ -79,9 +79,19 @@ const App: React.FC = () => {
 
           const today = toISODateString();
 
-          // Apply daily quest reset
+          // Strip any completedQuestIds that no longer exist in the current plan
+          // (handles plan regeneration — old IDs would otherwise persist silently)
+          const validQuestIds = new Set<string>(
+            (parsed.plan.dailyQuests as { id: string }[]).map(q => q.id)
+          );
           const rawGami: GamificationState = parsed.gamification || initialGamification;
-          const gami = resetQuestsIfNewDay(rawGami, today);
+          const sanitisedGami: GamificationState = {
+            ...rawGami,
+            completedQuestIds: rawGami.completedQuestIds.filter(id => validQuestIds.has(id)),
+          };
+
+          // Apply daily quest reset on top of the sanitised state
+          const gami = resetQuestsIfNewDay(sanitisedGami, today);
           setGamification(gami);
 
           setFoodLogs(parsed.foodLogs || []);
