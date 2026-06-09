@@ -144,7 +144,7 @@ const App: React.FC = () => {
       const calculated = calculateMetrics(userProfile);
       const generatedPlan = await generateWellnessPlan(userProfile);
       const today = toISODateString();
-      const freshGami: GamificationState = { ...initialGamification, lastQuestDate: today };
+      const freshGami: GamificationState = { ...initialGamification, lastQuestDate: today, streak: 1, lastLogDate: today };
       setProfile(userProfile);
       setMetrics(calculated);
       setPlan(generatedPlan);
