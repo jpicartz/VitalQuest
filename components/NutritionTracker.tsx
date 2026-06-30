@@ -265,7 +265,7 @@ const isViewingToday = selectedDate === toISODateString();
             <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Trends</button>
             <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Analysis</button>
         </div>
-        {activeTab === 'log' && (
+        {activeTab === 'log' && isViewingToday && (
           <Button variant="outline" onClick={() => setShowResetConfirm(true)} className="text-sm font-bold text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
             Reset Today's Log
           </Button>

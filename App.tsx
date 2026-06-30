@@ -124,7 +124,7 @@ const App: React.FC = () => {
         waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs,
       }));
     }
-  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted]);
+  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs]);
 
   // ── Badge checker — runs whenever gamification changes ────────────────────
   const runBadgeCheck = useCallback((
@@ -298,6 +298,7 @@ const App: React.FC = () => {
     setWeightHistory([]);
     setFavouriteFoods([]);
     setLifetimeQuestsCompleted(0);
+    setExerciseLogs([]);
     setView('onboarding');
     window.location.reload();
   };

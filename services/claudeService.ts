@@ -1,20 +1,34 @@
 import { UserProfile, WellnessPlan, FoodItem, MealSuggestion, MacroTargets, NutritionInsight } from "../types";
 import type { InsightsPayload } from "../utils/nutritionAggregates";
 
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
+// Full-reasoning model for plan generation and weekly insights
 const MODEL = 'claude-sonnet-4-5';
+// Fast structured-JSON model for food parsing, meal suggestions, recipes (~20× cheaper)
+const MODEL_FAST = 'claude-haiku-4-5-20251001';
 
-const callClaude = async (system: string, userMsg: string, maxTokens = 1500): Promise<string> => {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+// In dev: call Anthropic directly (key stays local, never deployed).
+// In production: route through /api/claude so the key never touches the browser bundle.
+const CLAUDE_URL = import.meta.env.DEV
+  ? 'https://api.anthropic.com/v1/messages'
+  : '/api/claude';
+
+const callClaude = async (system: string, userMsg: string, maxTokens = 1500, model = MODEL): Promise<string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'anthropic-version': '2023-06-01',
+  };
+
+  // Dev-only: attach key + CORS bypass header for direct browser calls
+  if (import.meta.env.DEV) {
+    headers['x-api-key'] = import.meta.env.VITE_ANTHROPIC_API_KEY || '';
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  }
+
+  const response = await fetch(CLAUDE_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY || '',
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers,
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: userMsg }],
@@ -137,7 +151,7 @@ Return ONLY JSON using EXACTLY these micro key names:
 Use 0 for unknown values. All numbers, no strings in micros.`;
 
   try {
-    const raw = await callClaude('Precise nutrition database. Return only JSON.', prompt, 1800);
+    const raw = await callClaude('Precise nutrition database. Return only JSON.', prompt, 900, MODEL_FAST);
     const data = parseJsonResponse(raw);
     return (data.foods || []).map((f: Record<string, unknown>, i: number) => ({
       id: `claude-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}`,
@@ -168,7 +182,7 @@ Return ONLY JSON using EXACTLY these micro key names:
 Use 0 for unknown values. All numbers.`;
 
   try {
-    const raw = await callClaude('Nutrition coach. Return only JSON.', prompt, 1800);
+    const raw = await callClaude('Nutrition coach. Return only JSON.', prompt, 1200, MODEL_FAST);
     const data = parseJsonResponse(raw);
     return (data.suggestions || []).map((s: Record<string, unknown>) => ({
       name: String(s.name),
@@ -191,7 +205,7 @@ export const generateRecipe = async (mealName: string, ingredients: string[], pr
   const profileContext = profile ? `Goal: ${profile.goal}. Restrictions: ${profile.dietaryRestrictions.join(', ') || 'None'}.` : '';
   const prompt = `${profileContext} Recipe for "${mealName}". Ingredients: ${ingredients.join(', ')}
 Return ONLY JSON: {"prepTime":"...","cookTime":"...","servings":2,"ingredients":[{"amount":"...","item":"..."}],"steps":["..."],"tips":"..."}`;
-  const raw = await callClaude('Chef. Return only JSON.', prompt, 1000);
+  const raw = await callClaude('Chef. Return only JSON.', prompt, 600, MODEL_FAST);
   return raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 };
 
