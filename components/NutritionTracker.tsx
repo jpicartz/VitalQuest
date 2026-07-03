@@ -448,11 +448,16 @@ const isViewingToday = selectedDate === toISODateString();
                                <div className="flex items-center gap-3">
                                    <div className="font-bold text-slate-600">{log.food.calories}</div>
                                    <div className="flex gap-1.5">
-                                       <button
-                                         onClick={() => onAddFavourite(log.food)}
-                                         title="Save to favourites"
-                                         className={`p-1.5 transition-colors ${favouriteFoods.some(f => f.name === log.food.name) ? 'text-yellow-400' : 'text-slate-300 hover:text-yellow-400'}`}
-                                       >★</button>
+                                       {(() => {
+                                         const existingFav = favouriteFoods.find(f => f.name === log.food.name);
+                                         return (
+                                           <button
+                                             onClick={() => existingFav ? onRemoveFavourite(existingFav.id) : onAddFavourite(log.food)}
+                                             title={existingFav ? 'Remove from favourites' : 'Save to favourites'}
+                                             className={`p-1.5 transition-colors ${existingFav ? 'text-yellow-400' : 'text-slate-300 hover:text-yellow-400'}`}
+                                           >★</button>
+                                         );
+                                       })()}
                                        <button onClick={() => deleteLog(log.id)} className="p-1.5 text-slate-400 hover:text-red-600">
                                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                        </button>

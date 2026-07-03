@@ -13,7 +13,11 @@ const ALLOWED_MODELS = new Set([
   'claude-haiku-4-5-20251001',
 ]);
 
-const MAX_OUTPUT_TOKENS = 2048;   // hard ceiling regardless of what the client asks
+// Ceiling on output tokens. Large enough for the app's biggest legitimate
+// response (meal suggestions / multi-item food parse enumerate 28 micronutrient
+// keys → ~1700-2500 tokens) while still bounding abuse cost (a 4096-token Haiku
+// reply is ~$0.02).
+const MAX_OUTPUT_TOKENS = 4096;
 const MAX_BODY_BYTES = 32 * 1024; // 32 KB request-body cap
 
 // Origins allowed to use the proxy from a browser. Non-browser clients (curl)

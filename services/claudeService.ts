@@ -75,7 +75,7 @@ Return ONLY valid JSON:
 Generate 5-6 dailyQuests mixing Nutrition, Sleep, Movement, Mindfulness.`;
 
   try {
-    const raw = await callClaude('Return only valid JSON.', prompt, 2000);
+    const raw = await callClaude('Return only valid JSON.', prompt, 3000);
     return parseJsonResponse(raw) as WellnessPlan;
   } catch (error) {
     console.error('generateWellnessPlan error:', error);
@@ -151,7 +151,7 @@ Return ONLY JSON using EXACTLY these micro key names:
 Use 0 for unknown values. All numbers, no strings in micros.`;
 
   try {
-    const raw = await callClaude('Precise nutrition database. Return only JSON.', prompt, 900, MODEL_FAST);
+    const raw = await callClaude('Precise nutrition database. Return only JSON.', prompt, 2500, MODEL_FAST);
     const data = parseJsonResponse(raw);
     return (data.foods || []).map((f: Record<string, unknown>, i: number) => ({
       id: `claude-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}`,
@@ -182,7 +182,7 @@ Return ONLY JSON using EXACTLY these micro key names:
 Use 0 for unknown values. All numbers.`;
 
   try {
-    const raw = await callClaude('Nutrition coach. Return only JSON.', prompt, 1200, MODEL_FAST);
+    const raw = await callClaude('Nutrition coach. Return only JSON.', prompt, 3000, MODEL_FAST);
     const data = parseJsonResponse(raw);
     return (data.suggestions || []).map((s: Record<string, unknown>) => ({
       name: String(s.name),
@@ -205,7 +205,7 @@ export const generateRecipe = async (mealName: string, ingredients: string[], pr
   const profileContext = profile ? `Goal: ${profile.goal}. Restrictions: ${profile.dietaryRestrictions.join(', ') || 'None'}.` : '';
   const prompt = `${profileContext} Recipe for "${mealName}". Ingredients: ${ingredients.join(', ')}
 Return ONLY JSON: {"prepTime":"...","cookTime":"...","servings":2,"ingredients":[{"amount":"...","item":"..."}],"steps":["..."],"tips":"..."}`;
-  const raw = await callClaude('Chef. Return only JSON.', prompt, 600, MODEL_FAST);
+  const raw = await callClaude('Chef. Return only JSON.', prompt, 1500, MODEL_FAST);
   return raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 };
 
@@ -220,7 +220,7 @@ Data: ${JSON.stringify(weekSummary)}
 Return ONLY JSON: {"headline":"...","patterns":["..."],"insights":["..."],"recommendations":["..."],"encouragement":"..."}`;
 
   try {
-    const raw = await callClaude('Supportive nutrition coach. Return only JSON.', prompt, 1200);
+    const raw = await callClaude('Supportive nutrition coach. Return only JSON.', prompt, 2000);
     const data = parseJsonResponse(raw);
     return {
       headline: data.headline || 'Keep logging consistently.',
