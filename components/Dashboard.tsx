@@ -10,7 +10,7 @@ import { BADGE_MAP, BADGE_DEFINITIONS } from '../data/badgeDefinitions';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { toISODateString } from '../utils/dateUtils';
 import { ScoreRing } from './ui/ScoreRing';
-import { IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl, IconCheck } from '@tabler/icons-react';
+import { IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl, IconCheck, IconPlus, IconX } from '@tabler/icons-react';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -272,22 +272,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ── Progress ── */}
       {activeTab === 'progress' && (
-        <div className="space-y-6">
+        <div className="space-y-5 animate-fade-in">
           {/* Weight Log */}
-          <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-800 mb-1">Body Weight</h3>
+          <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+            <h3 className="text-lg font-bold text-fg mb-3">Body Weight</h3>
             <div className="flex gap-6 mb-4">
               <div>
-                <p className="text-xs text-slate-400 font-bold uppercase">Starting</p>
-                <p className="text-2xl font-black text-slate-700">{startingWeight} <span className="text-sm font-normal text-slate-400">kg</span></p>
+                <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Starting</p>
+                <p className="nums text-2xl font-bold text-fg">{startingWeight} <span className="text-sm font-normal text-fg-mute">kg</span></p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 font-bold uppercase">Current</p>
-                <p className="text-2xl font-black text-slate-700">{currentWeight} <span className="text-sm font-normal text-slate-400">kg</span></p>
+                <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Current</p>
+                <p className="nums text-2xl font-bold text-fg">{currentWeight} <span className="text-sm font-normal text-fg-mute">kg</span></p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 font-bold uppercase">Change</p>
-                <p className={`text-2xl font-black ${weightDelta < 0 ? 'text-green-600' : weightDelta > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Change</p>
+                <p className={`nums text-2xl font-bold ${weightDelta < 0 ? 'text-nutri' : weightDelta > 0 ? 'text-fat' : 'text-fg-mute'}`}>
                   {weightDelta > 0 ? '+' : ''}{weightDelta} <span className="text-sm font-normal">kg</span>
                 </p>
               </div>
@@ -297,10 +297,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="h-36 mb-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={weightChartData}>
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} width={32} />
-                    <Tooltip formatter={(v: number) => [`${v} kg`, 'Weight']} />
-                    <Line type="monotone" dataKey="kg" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e' }} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgb(var(--fg-soft))' }} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'rgb(var(--fg-soft))' }} width={32} />
+                    <Tooltip formatter={(v: number) => [`${v} kg`, 'Weight']} contentStyle={{ background: 'rgb(var(--surface-card))', border: '1px solid rgb(var(--edge))', borderRadius: 12, color: 'rgb(var(--fg))' }} />
+                    <Line type="monotone" dataKey="kg" stroke="rgb(var(--nutri))" strokeWidth={2} dot={{ r: 3, fill: 'rgb(var(--nutri))' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -314,7 +314,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 value={weightInput}
                 onChange={e => setWeightInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogWeightSubmit()}
-                className="flex-1 p-3 border-2 border-slate-200 rounded-xl focus:border-green-400 focus:outline-none font-medium"
+                className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none font-medium"
               />
               <Button onClick={handleLogWeightSubmit} disabled={!weightInput}>Log</Button>
             </div>
@@ -330,32 +330,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
               'Strength Training': '🏋️', Yoga: '🧘', HIIT: '⚡', Other: '💪',
             };
             return (
-              <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800">Exercise</h3>
-                    {todayXp > 0 && <p className="text-xs text-green-600 font-semibold">+{todayXp} XP earned today</p>}
+                    <h3 className="text-lg font-bold text-fg">Exercise</h3>
+                    {todayXp > 0 && <p className="nums text-xs text-nutri font-semibold">+{todayXp} XP earned today</p>}
                   </div>
                   <button
                     onClick={() => { setExType('Running'); setExDuration(''); setExNotes(''); setIsLoggingExercise(true); }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-xl transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-nutri text-white dark:text-[#08210f] text-sm font-bold rounded-control hover:brightness-[1.05] transition-all"
                   >
-                    + Log
+                    <IconPlus size={16} stroke={2.5} /> Log
                   </button>
                 </div>
                 {todayExercise.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">No exercise logged today. Keep moving! 💪</p>
+                  <p className="text-sm text-fg-mute italic">No exercise logged today. Keep moving!</p>
                 ) : (
                   <div className="space-y-2">
                     {todayExercise.map(e => (
-                      <div key={e.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div key={e.id} className="flex items-center gap-3 p-3 bg-raised rounded-tile border border-edge">
                         <span className="text-xl">{EXERCISE_ICONS[e.type] ?? '💪'}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-800 text-sm">{e.type}</p>
-                          <p className="text-xs text-slate-400">{e.durationMin} min{e.notes ? ` · ${e.notes}` : ''}</p>
+                          <p className="font-semibold text-fg text-sm">{e.type}</p>
+                          <p className="nums text-xs text-fg-mute">{e.durationMin} min{e.notes ? ` · ${e.notes}` : ''}</p>
                         </div>
-                        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg shrink-0">+{e.xpEarned} XP</span>
-                        <button onClick={() => onDeleteExercise(e.id)} className="text-slate-300 hover:text-red-400 transition-colors ml-1 text-lg leading-none">×</button>
+                        <span className="nums text-xs font-bold text-spark bg-spark/10 px-2 py-1 rounded-lg shrink-0">+{e.xpEarned} XP</span>
+                        <button onClick={() => onDeleteExercise(e.id)} aria-label="Delete" className="text-fg-mute hover:text-fat transition-colors ml-1"><IconX size={16} /></button>
                       </div>
                     ))}
                   </div>
@@ -365,20 +365,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           })()}
 
           {/* Badges */}
-          <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Achievements</h3>
+          <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+            <h3 className="text-lg font-bold text-fg mb-4">Achievements</h3>
             {gamification.badges.length === 0 ? (
-              <p className="text-sm text-slate-400 italic">No badges yet — complete quests, log food, and build your streak to earn them!</p>
+              <p className="text-sm text-fg-mute italic">No badges yet — complete quests, log food, and build your streak to earn them!</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {gamification.badges.map(id => {
                   const b = BADGE_MAP[id];
                   if (!b) return null;
                   return (
-                    <div key={id} className="flex flex-col items-center gap-1 p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                    <div key={id} className="flex flex-col items-center gap-1 p-4 rounded-tile bg-spark/10 border border-spark/25 text-center">
                       <span className="text-3xl">{b.emoji}</span>
-                      <span className="font-bold text-amber-800 text-sm">{b.title}</span>
-                      <span className="text-xs text-amber-600/80">{b.description}</span>
+                      <span className="font-bold text-fg text-sm">{b.title}</span>
+                      <span className="text-xs text-fg-soft">{b.description}</span>
                     </div>
                   );
                 })}
@@ -391,13 +391,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
               if (locked.length === 0) return null;
               return (
                 <div className="mt-4">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Locked</p>
+                  <p className="text-xs font-semibold text-fg-mute uppercase tracking-wider mb-3">Locked</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {locked.map(b => (
-                      <div key={b.id} className="flex flex-col items-center gap-1 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center opacity-50 grayscale">
+                      <div key={b.id} className="flex flex-col items-center gap-1 p-4 rounded-tile bg-raised border border-edge text-center opacity-50 grayscale">
                         <span className="text-3xl">{b.emoji}</span>
-                        <span className="font-bold text-slate-600 text-sm">{b.title}</span>
-                        <span className="text-xs text-slate-500">{b.description}</span>
+                        <span className="font-bold text-fg text-sm">{b.title}</span>
+                        <span className="text-xs text-fg-soft">{b.description}</span>
                       </div>
                     ))}
                   </div>
@@ -407,18 +407,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </section>
 
           {/* Stats */}
-          <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Stats</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+            <h3 className="text-lg font-bold text-fg mb-4">Stats</h3>
+            <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'Total XP', value: gamification.xp, suffix: 'xp' },
                 { label: 'Current Level', value: gamification.level, suffix: '' },
-                { label: 'Day Streak', value: gamification.streak, suffix: '🔥' },
+                { label: 'Day Streak', value: gamification.streak, suffix: '' },
                 { label: 'Badges Earned', value: gamification.badges.length, suffix: '' },
               ].map(stat => (
-                <div key={stat.label} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <p className="text-xs font-bold text-slate-400 uppercase">{stat.label}</p>
-                  <p className="text-2xl font-black text-slate-800">{stat.value} <span className="text-sm font-normal text-slate-500">{stat.suffix}</span></p>
+                <div key={stat.label} className="bg-raised p-4 rounded-tile">
+                  <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{stat.label}</p>
+                  <p className="nums text-2xl font-bold text-fg">{stat.value} <span className="text-sm font-normal text-fg-soft">{stat.suffix}</span></p>
                 </div>
               ))}
             </div>
@@ -427,21 +427,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       <div className="mt-12 text-center">
-        <Button variant="ghost" onClick={() => setShowStartOverConfirm(true)} className="text-slate-400 text-sm">Start Over</Button>
+        <Button variant="ghost" onClick={() => setShowStartOverConfirm(true)} className="text-fg-mute text-sm">Start Over</Button>
       </div>
 
       {/* ── Exercise log modal ── */}
       {isLoggingExercise && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setIsLoggingExercise(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-slate-800">Log Exercise</h3>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setIsLoggingExercise(false)}>
+          <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-fg">Log Exercise</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Type</label>
+                <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Type</label>
                 <select
                   value={exType}
                   onChange={e => setExType(e.target.value)}
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-green-400 focus:outline-none font-medium"
+                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg focus:border-nutri focus:outline-none font-medium"
                 >
                   {['Running','Walking','Cycling','Swimming','Strength Training','Yoga','HIIT','Other'].map(t => (
                     <option key={t} value={t}>{t}</option>
@@ -449,25 +449,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Duration (minutes)</label>
+                <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Duration (minutes)</label>
                 <input
                   type="number" min="1" placeholder="e.g. 30"
                   value={exDuration}
                   onChange={e => setExDuration(e.target.value)}
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-green-400 focus:outline-none font-medium"
+                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none font-medium"
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Notes <span className="normal-case font-normal text-slate-400">(optional)</span></label>
+                <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Notes <span className="normal-case font-normal text-fg-mute">(optional)</span></label>
                 <input
                   type="text" placeholder="e.g. Morning run, felt great"
                   value={exNotes}
                   onChange={e => setExNotes(e.target.value)}
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-green-400 focus:outline-none font-medium"
+                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none font-medium"
                 />
               </div>
               {exDuration && Number(exDuration) > 0 && (
-                <p className="text-sm text-green-600 font-semibold bg-green-50 px-3 py-2 rounded-xl">
+                <p className="nums text-sm text-nutri font-semibold bg-nutri/10 px-3 py-2 rounded-control">
                   +{Math.min(Math.floor(Number(exDuration) / 15) * 5, 30)} XP
                 </p>
               )}
@@ -490,13 +490,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {showStartOverConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowStartOverConfirm(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-slate-800">Start Over?</h3>
-            <p className="text-sm text-slate-500">All your data will be permanently deleted.</p>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowStartOverConfirm(false)}>
+          <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-fg">Start Over?</h3>
+            <p className="text-sm text-fg-soft">All your data will be permanently deleted.</p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowStartOverConfirm(false)}>Cancel</Button>
-              <Button variant="primary" className="flex-1 bg-red-500 hover:bg-red-600 border-red-700" onClick={onReset}>Yes, Start Over</Button>
+              <Button variant="primary" className="flex-1 bg-red-500 hover:brightness-105" onClick={onReset}>Yes, Start Over</Button>
             </div>
           </div>
         </div>
