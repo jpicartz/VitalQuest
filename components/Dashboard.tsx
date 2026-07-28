@@ -9,6 +9,8 @@ import { NutritionTracker } from './NutritionTracker';
 import { BADGE_MAP, BADGE_DEFINITIONS } from '../data/badgeDefinitions';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { toISODateString } from '../utils/dateUtils';
+import { ScoreRing } from './ui/ScoreRing';
+import { IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl, IconCheck } from '@tabler/icons-react';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -125,34 +127,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 pb-20">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-2xl shadow-inner">⚡</div>
+      <header className="flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-sm dark:shadow-none p-5 mb-5 animate-fade-in">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <ScoreRing value={gamification.xp % 100} max={100} size={88} centerValue={gamification.level} label="Level" colorClass="text-nutri" />
           <div>
-            <h2 className="font-bold text-slate-800 text-lg">Level {gamification.level}</h2>
-            <div className="w-32 h-2 bg-slate-100 rounded-full mt-1 overflow-hidden">
-              <div className="h-full bg-amber-400 transition-all duration-500" style={{ width: `${gamification.xp % 100}%` }} />
+            <div className="nums text-2xl font-bold text-fg leading-none">
+              {gamification.xp} <span className="text-base font-semibold text-fg-soft">XP</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{gamification.xp % 100} / 100 XP to next level</p>
+            <p className="text-xs text-fg-soft mt-1.5">{100 - (gamification.xp % 100)} to level {gamification.level + 1}</p>
           </div>
         </div>
-        <div className="flex gap-6 text-center">
-          <div>
-            <span className="block text-xl font-black text-green-600">{gamification.streak} 🔥</span>
-            <span className="text-xs font-bold text-slate-400 uppercase">Day Streak</span>
+        <div className="flex gap-3 w-full sm:w-auto sm:ml-auto">
+          <div className="flex-1 sm:flex-none flex items-center gap-2.5 bg-raised rounded-tile px-4 py-2.5">
+            <IconFlame size={20} className="text-spark" />
+            <div>
+              <div className="nums text-lg font-bold text-fg leading-none">{gamification.streak}</div>
+              <div className="text-[11px] text-fg-soft">day streak</div>
+            </div>
           </div>
-          <div>
-            <span className="block text-xl font-black text-slate-800">
-              {caloriesConsumed} <span className="text-slate-400 font-normal text-sm">/ {Math.round(metrics.tdee)}</span>
-            </span>
-            <span className="text-xs font-bold text-slate-400 uppercase">Kcal Eaten</span>
+          <div className="flex-1 sm:flex-none flex items-center gap-2.5 bg-raised rounded-tile px-4 py-2.5">
+            <IconApple size={20} className="text-nutri" />
+            <div>
+              <div className="nums text-lg font-bold text-fg leading-none">
+                {caloriesConsumed}<span className="text-xs font-normal text-fg-soft"> / {Math.round(metrics.tdee)}</span>
+              </div>
+              <div className="text-[11px] text-fg-soft">kcal eaten</div>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Badges row */}
       {gamification.badges.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-4">
+        <div className="flex gap-2 flex-wrap mb-4 animate-fade-in">
           {gamification.badges.map(id => {
             const b = BADGE_MAP[id];
             if (!b) return null;
@@ -160,9 +167,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span
                 key={id}
                 title={b.description}
-                className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm"
+                className="inline-flex items-center gap-1.5 bg-spark/10 border border-spark/25 text-fg text-xs font-semibold px-3 py-1.5 rounded-full"
               >
-                {b.emoji} {b.title}
+                <span className="text-sm leading-none">{b.emoji}</span> {b.title}
               </span>
             );
           })}
@@ -170,26 +177,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 bg-slate-100 p-1 rounded-xl w-fit mx-auto md:mx-0 overflow-x-auto">
-        {(['plan', 'nutrition', 'quests', 'progress'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-              activeTab === tab ? 'bg-white shadow text-green-600' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab === 'plan' ? 'My Plan'
-              : tab === 'nutrition' ? 'Nutrition & Logs'
-              : tab === 'quests' ? 'Daily Quests'
-              : 'Progress'}
-            {tab === 'quests' && plan.dailyQuests.length - gamification.completedQuestIds.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                {plan.dailyQuests.length - gamification.completedQuestIds.length}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex gap-1 mb-6 bg-raised p-1 rounded-control w-fit mx-auto md:mx-0 overflow-x-auto">
+        {(['plan', 'nutrition', 'quests', 'progress'] as const).map((tab) => {
+          const meta = {
+            plan: { label: 'My Plan', Icon: IconMap2 },
+            nutrition: { label: 'Nutrition', Icon: IconBowl },
+            quests: { label: 'Quests', Icon: IconTrophy },
+            progress: { label: 'Progress', Icon: IconActivity },
+          }[tab];
+          const remaining = plan.dailyQuests.length - gamification.completedQuestIds.length;
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] font-semibold text-sm transition-all whitespace-nowrap ${
+                activeTab === tab ? 'bg-card text-nutri shadow-sm dark:shadow-none' : 'text-fg-soft hover:text-fg'
+              }`}
+            >
+              <meta.Icon size={16} />
+              {meta.label}
+              {tab === 'quests' && remaining > 0 && (
+                <span className="nums ml-0.5 bg-nutri text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── My Plan ── */}
@@ -222,37 +234,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ── Daily Quests ── */}
       {activeTab === 'quests' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-fade-in">
           <div className="flex justify-between items-end mb-2">
-            <h3 className="text-xl font-bold text-slate-800">Today's Goals</h3>
-            <span className="text-sm font-semibold text-green-600">{calculateProgress()}% Complete</span>
+            <h3 className="text-xl font-bold text-fg">Today's Goals</h3>
+            <span className="nums text-sm font-semibold text-nutri">{calculateProgress()}% complete</span>
           </div>
-          <div className="h-4 bg-slate-200 rounded-full overflow-hidden mb-6">
-            <div className="h-full bg-green-500 transition-all duration-1000 ease-out" style={{ width: `${calculateProgress()}%` }} />
+          <div className="h-3 bg-track rounded-full overflow-hidden mb-6">
+            <div className="h-full bg-nutri rounded-full transition-all duration-700 ease-out" style={{ width: `${calculateProgress()}%` }} />
           </div>
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {plan.dailyQuests.map((quest) => {
               const isCompleted = gamification.completedQuestIds.includes(quest.id);
               return (
                 <div
                   key={quest.id}
                   onClick={() => !isCompleted && completeQuest(quest.id, quest.xpReward)}
-                  className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer group ${
+                  className={`flex items-center gap-4 p-4 rounded-card border transition-all ${
                     isCompleted
-                      ? 'bg-green-50 border-green-200 opacity-60'
-                      : 'bg-white border-slate-200 hover:border-green-400 hover:shadow-md'
+                      ? 'bg-raised border-edge opacity-70'
+                      : 'bg-card border-edge hover:border-nutri/50 cursor-pointer shadow-sm dark:shadow-none'
                   }`}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white ${isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
-                      {isCompleted && '✓'}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className={`font-bold text-lg ${isCompleted ? 'text-green-800 line-through' : 'text-slate-800'}`}>{quest.title}</h4>
-                      <p className="text-slate-500 text-sm">{quest.description}</p>
-                    </div>
-                    <div className="text-amber-500 font-bold text-sm bg-amber-50 px-2 py-1 rounded-lg">+{quest.xpReward} XP</div>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${isCompleted ? 'bg-nutri text-white' : 'border-2 border-edge'}`}>
+                    {isCompleted && <IconCheck size={16} stroke={3} />}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-semibold ${isCompleted ? 'text-fg-soft line-through' : 'text-fg'}`}>{quest.title}</h4>
+                    <p className="text-fg-soft text-sm">{quest.description}</p>
+                  </div>
+                  <span className="nums text-xs font-bold text-spark bg-spark/10 px-2.5 py-1 rounded-full shrink-0">+{quest.xpReward} XP</span>
                 </div>
               );
             })}
