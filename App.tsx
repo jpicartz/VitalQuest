@@ -10,6 +10,9 @@ import { toISODateString, isSameISODate, timestampForISODate } from './utils/dat
 import { updateStreak, resetQuestsIfNewDay } from './utils/streakUtils';
 import { checkBadges } from './utils/badgeUtils';
 import { computeMicroScore } from './utils/nutritionAggregates';
+import { IconBolt, IconSun, IconMoon } from '@tabler/icons-react';
+
+type Theme = 'light' | 'dark';
 
 const calculateMetrics = (profile: UserProfile): CalculatedMetrics => {
   const s = profile.gender === 'Male' ? 5 : -161;
@@ -67,6 +70,18 @@ const App: React.FC = () => {
   const [favouriteFoods, setFavouriteFoods] = useState<FoodItem[]>([]);
   const [lifetimeQuestsCompleted, setLifetimeQuestsCompleted] = useState<number>(0);
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
+
+  // ── Theme (dual-mode) — isolated from vitalQuestData, own localStorage key ──
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem('vitalQuestTheme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    return typeof window !== 'undefined'
+      && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('vitalQuestTheme', theme);
+  }, [theme]);
 
   // ── Load from localStorage ────────────────────────────────────────────────
   useEffect(() => {
@@ -308,14 +323,29 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      <nav className="bg-white border-b sticky top-0 z-50">
+    <div className="min-h-screen bg-page text-fg flex flex-col font-sans transition-colors">
+      <nav className="bg-card/85 backdrop-blur border-b border-edge sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-green-500 rounded flex items-center justify-center text-white font-bold">V</div>
-            <span className="font-extrabold text-xl tracking-tight text-slate-900">VitalQuest</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-nutri rounded-[10px] flex items-center justify-center text-white">
+              <IconBolt size={18} stroke={2.5} />
+            </div>
+            <span className="font-extrabold text-xl tracking-tight text-fg">VitalQuest</span>
           </div>
-          {view === 'dashboard' && <div className="text-sm font-semibold text-slate-500">{gamification.xp} XP</div>}
+          <div className="flex items-center gap-3">
+            {view === 'dashboard' && (
+              <span className="inline-flex items-center gap-1 nums text-sm font-semibold text-fg-soft">
+                <IconBolt size={15} className="text-spark" /> {gamification.xp} XP
+              </span>
+            )}
+            <button
+              onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+              aria-label="Toggle light or dark theme"
+              className="w-9 h-9 rounded-control flex items-center justify-center text-fg-soft hover:bg-raised hover:text-fg transition-colors"
+            >
+              {theme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
+            </button>
+          </div>
         </div>
       </nav>
       <main className="flex-grow">

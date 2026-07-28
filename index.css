@@ -2,25 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Phase 0: replicate the old inline styles so the migration is visually identical.
-   Design tokens, keyframes, and dark-mode variables get added in Phase 1. */
+/* ── Vitals design tokens ──────────────────────────────────────────────────
+   Space-separated RGB triplets so Tailwind can apply opacity via
+   rgb(var(--token) / <alpha-value>). Light is the default; .dark on <html>
+   swaps every value, so most components need no dark: variants. */
 @layer base {
+  :root {
+    --surface-page: 242 241 238;   /* #f2f1ee warm neutral */
+    --surface-card: 255 255 255;   /* #ffffff */
+    --surface-raised: 248 248 246; /* #f8f8f6 */
+    --fg: 28 28 30;                /* #1c1c1e */
+    --fg-soft: 138 138 142;        /* #8a8a8e */
+    --fg-mute: 176 174 168;        /* #b0aea8 */
+    --edge: 230 227 221;           /* #e6e3dd */
+    --nutri: 22 163 74;            /* #16a34a nutrition/accent */
+    --hydro: 14 165 233;           /* #0ea5e9 water */
+    --spark: 245 158 11;           /* #f59e0b streak/XP/energy */
+    --macro-protein: 22 163 74;    /* #16a34a */
+    --macro-carbs: 245 158 11;     /* #f59e0b */
+    --macro-fat: 244 63 94;        /* #f43f5e */
+    --track: 230 227 221;          /* #e6e3dd ring/bar track */
+  }
+
+  .dark {
+    --surface-page: 11 17 32;      /* #0b1120 deep navy */
+    --surface-card: 19 28 46;      /* #131c2e */
+    --surface-raised: 26 36 56;    /* #1a2438 */
+    --fg: 248 250 252;             /* #f8fafc */
+    --fg-soft: 148 163 184;        /* #94a3b8 */
+    --fg-mute: 100 116 139;        /* #64748b */
+    --edge: 30 41 59;              /* #1e293b */
+    --nutri: 74 222 128;           /* #4ade80 */
+    --hydro: 56 189 248;           /* #38bdf8 */
+    --spark: 251 191 36;           /* #fbbf24 */
+    --macro-protein: 74 222 128;   /* #4ade80 */
+    --macro-carbs: 251 191 36;     /* #fbbf24 */
+    --macro-fat: 251 113 133;      /* #fb7185 */
+    --track: 30 41 59;             /* #1e293b */
+  }
+
   body {
     font-family: 'Inter', system-ui, sans-serif;
   }
+
+  /* Tabular figures for aligned metrics — applied via .nums utility. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
 }
 
-/* Custom scrollbar (ported from the old index.html inline <style>) */
+/* Token-aware scrollbar (adapts to light/dark). */
 ::-webkit-scrollbar {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: rgb(var(--surface-page));
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgb(var(--edge));
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgb(var(--fg-mute));
 }
