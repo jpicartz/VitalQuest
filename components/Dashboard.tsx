@@ -297,10 +297,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="h-36 mb-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={weightChartData}>
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgb(var(--fg-soft))' }} />
-                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'rgb(var(--fg-soft))' }} width={32} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#94a3b8' }} width={32} />
                     <Tooltip formatter={(v: number) => [`${v} kg`, 'Weight']} contentStyle={{ background: 'rgb(var(--surface-card))', border: '1px solid rgb(var(--edge))', borderRadius: 12, color: 'rgb(var(--fg))' }} />
-                    <Line type="monotone" dataKey="kg" stroke="rgb(var(--nutri))" strokeWidth={2} dot={{ r: 3, fill: 'rgb(var(--nutri))' }} />
+                    <Line type="monotone" dataKey="kg" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
