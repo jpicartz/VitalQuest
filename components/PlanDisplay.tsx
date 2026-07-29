@@ -6,7 +6,7 @@ import {
 } from '@tabler/icons-react';
 
 const SupplementCard: React.FC<{ supp: SupplementRecommendation }> = ({ supp }) => (
-  <div className="bg-card border border-edge border-l-4 border-l-nutri p-4 rounded-r-tile shadow-sm dark:shadow-none mb-3">
+  <div className="bg-card border border-edge p-4 rounded-tile shadow-sm dark:shadow-none mb-3">
     <div className="flex justify-between items-start gap-2">
       <h4 className="font-bold text-lg text-fg">{supp.name}</h4>
       <span className={`text-xs px-2 py-1 rounded-full font-bold shrink-0 ${
