@@ -3,6 +3,7 @@ import { Button } from './ui/Button';
 import { MacroTargets, UserProfile, WellnessPlan, NutritionInsight } from '../types';
 import { DailyNutritionSummary, buildInsightsPayload } from '../utils/nutritionAggregates';
 import { generateNutritionInsights } from '../services/claudeService';
+import { IconSparkles, IconCheck, IconArrowRight } from '@tabler/icons-react';
 
 interface NutritionInsightsProps {
   dailySummaries: DailyNutritionSummary[];
@@ -45,46 +46,46 @@ export const NutritionInsights: React.FC<NutritionInsightsProps> = ({
 
   if (daysLogged === 0) {
     return (
-      <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-3xl">
-        <h3 className="font-bold text-indigo-900 mb-2">AI Pattern Insights</h3>
-        <p className="text-sm text-indigo-700">Log meals across a few days — Claude will analyze your last 7 days and surface patterns.</p>
+      <div className="bg-raised border border-edge p-6 rounded-card">
+        <h3 className="inline-flex items-center gap-2 font-bold text-fg mb-2"><IconSparkles size={18} className="text-nutri" /> AI Pattern Insights</h3>
+        <p className="text-sm text-fg-soft">Log meals across a few days — Claude will analyze your last 7 days and surface patterns.</p>
       </div>
     );
   }
 
   if (daysLogged === 1) {
     return (
-      <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-3xl">
-        <h3 className="font-bold text-indigo-900 mb-2">AI Pattern Insights</h3>
-        <p className="text-sm text-indigo-700">Log one more day to unlock weekly pattern analysis ({daysLogged}/2 days logged).</p>
+      <div className="bg-raised border border-edge p-6 rounded-card">
+        <h3 className="inline-flex items-center gap-2 font-bold text-fg mb-2"><IconSparkles size={18} className="text-nutri" /> AI Pattern Insights</h3>
+        <p className="text-sm text-fg-soft">Log one more day to unlock weekly pattern analysis ({daysLogged}/2 days logged).</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 rounded-3xl text-white shadow-lg" style={{background: 'linear-gradient(135deg, #6366f1, #7c3aed)'}}>
+    <div className="p-6 rounded-modal text-white shadow-lg" style={{background: 'linear-gradient(135deg, #6366f1, #7c3aed)'}}>
       <div className="flex justify-between items-start mb-4 gap-4">
         <div>
-          <h3 className="text-xl font-bold">AI Pattern Insights</h3>
-          <p className="text-sm text-white/70 mt-1">Based on your last 7 days ({daysLogged} days logged)</p>
+          <h3 className="inline-flex items-center gap-2 text-xl font-bold"><IconSparkles size={20} /> AI Pattern Insights</h3>
+          <p className="nums text-sm text-white/70 mt-1">Based on your last 7 days ({daysLogged} days logged)</p>
         </div>
         <Button variant="outline" className="!py-1.5 !px-3 text-xs bg-white/10 border-white/30 text-white hover:bg-white/20 shrink-0" onClick={loadInsights} disabled={isLoading}>
           {isLoading ? 'Analyzing…' : 'Refresh'}
         </Button>
       </div>
       {isLoading && !insights && <p className="text-white/80 text-sm py-4">Reading your logs…</p>}
-      {error && <p className="text-sm bg-white/10 p-3 rounded-xl">{error} <button onClick={loadInsights} className="underline font-bold ml-1">Retry</button></p>}
+      {error && <p className="text-sm bg-white/10 p-3 rounded-control">{error} <button onClick={loadInsights} className="underline font-bold ml-1">Retry</button></p>}
       {insights && (
         <div className="space-y-4">
           <p className="text-lg font-bold">{insights.headline}</p>
           {insights.patterns.length > 0 && (
-            <ul className="space-y-2 text-sm bg-white/10 p-4 rounded-2xl">
-              {insights.patterns.map((p, i) => <li key={i}>→ {p}</li>)}
+            <ul className="space-y-2 text-sm bg-white/10 p-4 rounded-tile">
+              {insights.patterns.map((p, i) => <li key={i} className="flex items-start gap-2"><IconArrowRight size={15} className="shrink-0 mt-0.5 opacity-80" /> {p}</li>)}
             </ul>
           )}
           {insights.recommendations.length > 0 && (
             <ul className="space-y-2 text-sm">
-              {insights.recommendations.map((r, i) => <li key={i} className="bg-white/10 px-3 py-2 rounded-xl">✓ {r}</li>)}
+              {insights.recommendations.map((r, i) => <li key={i} className="flex items-start gap-2 bg-white/10 px-3 py-2 rounded-control"><IconCheck size={15} stroke={2.5} className="shrink-0 mt-0.5" /> {r}</li>)}
             </ul>
           )}
         </div>
