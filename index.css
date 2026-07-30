@@ -41,12 +41,21 @@
     --track: 30 41 59;             /* #1e293b */
   }
 
+  /* Inter carries body/UI copy for legibility; Space Grotesk is the display
+     voice for headings and metrics — the "data-forward" character lives there. */
   body {
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  /* Tabular figures for aligned metrics — applied via .nums utility. */
+  h1, h2, h3, h4 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Tabular figures for aligned metrics — applied via .nums utility.
+     Space Grotesk gives the big numbers their sporty, dashboard feel. */
   .nums {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }
