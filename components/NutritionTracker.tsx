@@ -625,7 +625,8 @@ const isViewingToday = selectedDate === toISODateString();
              const carbsKcal   = Math.round(consumedMacros.carbs * 4);
              const fatKcal     = Math.round(consumedMacros.fat * 9);
              const totalKcal   = proteinKcal + carbsKcal + fatKcal;
-             const COLORS = ['rgb(var(--macro-protein))', 'rgb(var(--macro-carbs))', 'rgb(var(--macro-fat))'];
+             // Concrete hex (not CSS vars) so the SVG fill renders in Safari too; these vivid hues read on both light and dark.
+             const COLORS = ['#22c55e', '#f59e0b', '#f43f5e'];
              const macroSlices = [
                { name: 'Protein',  kcal: proteinKcal, grams: Math.round(consumedMacros.protein), color: COLORS[0] },
                { name: 'Carbs',    kcal: carbsKcal,   grams: Math.round(consumedMacros.carbs),   color: COLORS[1] },
