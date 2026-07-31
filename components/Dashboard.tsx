@@ -184,7 +184,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0 overflow-x-auto">
+      {/* 4-up grid on phones so every tab is reachable without a hidden
+          horizontal scroll; inline row from sm: upward. */}
+      <div className="grid grid-cols-4 sm:flex gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0" role="tablist">
         {(['plan', 'nutrition', 'quests', 'progress'] as const).map((tab) => {
           const meta = {
             plan: { label: 'My Plan', Icon: IconMap2 },
@@ -196,15 +198,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
           return (
             <button
               key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
               onClick={() => setActiveTab(tab)}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-[8px] font-semibold text-sm transition-all whitespace-nowrap ${
+              className={`relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm transition-all whitespace-nowrap ${
                 activeTab === tab ? 'bg-card text-nutri shadow-sm dark:shadow-none' : 'text-fg-soft hover:text-fg'
               }`}
             >
-              <meta.Icon size={16} />
+              <meta.Icon size={16} className="shrink-0" />
               {meta.label}
               {tab === 'quests' && remaining > 0 && (
-                <span className="nums ml-0.5 bg-nutri-strong text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
+                <span className="nums absolute top-0.5 right-1 sm:static sm:ml-0.5 bg-nutri-strong text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
               )}
             </button>
           );
