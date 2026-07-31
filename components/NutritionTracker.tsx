@@ -73,6 +73,7 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
   const [selectedMeal, setSelectedMeal] = useState<MealType>('Breakfast');
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [selectedNutrient, setSelectedNutrient] = useState<string | null>(null);
   const [mealCriteria, setMealCriteria] = useState('');
 const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
@@ -142,11 +143,23 @@ const isViewingToday = selectedDate === toISODateString();
   const handleAiParse = async () => {
     if(!aiInput.trim()) return;
     setIsAiLoading(true);
-    const foods = await parseFoodLog(aiInput);
-    foods.forEach(f => onAddFood(selectedMeal, f));
-    setIsAiLoading(false);
-    setAiInput('');
-    setIsAdding(false);
+    setAiError(null);
+    try {
+      const foods = await parseFoodLog(aiInput);
+      if (foods.length === 0) {
+        // Request succeeded but nothing was recognised — keep the text so the
+        // user can reword it rather than silently closing the form.
+        setAiError("We couldn't recognise any food in that. Try something like \"2 eggs and a slice of toast\".");
+        return;
+      }
+      foods.forEach(f => onAddFood(selectedMeal, f));
+      setAiInput('');
+      setIsAdding(false);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const handleManualAdd = (food: FoodItem) => {
@@ -215,16 +228,14 @@ const isViewingToday = selectedDate === toISODateString();
     setIsMealLoading(true);
     setMealError(null);
     try {
-      console.log('Calling suggestMeals with:', mealCriteria);
       const results = await suggestMeals(mealCriteria, profile, targets);
-      console.log('suggestMeals returned:', results);
       if (!results || results.length === 0) {
-        setMealError('No suggestions returned. Check console for details.');
+        setMealError("We couldn't come up with meals for that. Try describing it differently.");
       }
       setMealSuggestions(results);
-    } catch (e: any) {
+    } catch (e) {
       console.error('handleMealGenerate error:', e);
-      setMealError(e?.message || 'Unknown error occurred');
+      setMealError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
     } finally {
       setIsMealLoading(false);
     }
@@ -487,11 +498,24 @@ const isViewingToday = selectedDate === toISODateString();
                 <button onClick={() => setIsAdding(false)} className="text-fg-soft hover:text-fg text-sm font-medium">Cancel</button>
               </div>
               <div className="mb-8">
-                 <label className="inline-flex items-center gap-1.5 text-sm font-bold text-fg mb-2"><IconSparkles size={16} className="text-nutri" /> Quick add with AI</label>
+                 <label htmlFor="ai-food-input" className="inline-flex items-center gap-1.5 text-sm font-bold text-fg mb-2"><IconSparkles size={16} className="text-nutri" /> Quick add with AI</label>
                  <div className="flex gap-2">
-                   <input type="text" value={aiInput} onChange={e => setAiInput(e.target.value)} placeholder="e.g. 2 eggs and a banana" className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none" />
-                   <Button onClick={handleAiParse} disabled={isAiLoading || !aiInput}>{isAiLoading ? '...' : 'Add'}</Button>
+                   <input
+                     id="ai-food-input"
+                     type="text"
+                     value={aiInput}
+                     onChange={e => setAiInput(e.target.value)}
+                     onKeyDown={e => { if (e.key === 'Enter' && !isAiLoading && aiInput) handleAiParse(); }}
+                     placeholder="e.g. 2 eggs and a banana"
+                     aria-invalid={!!aiError}
+                     aria-describedby={aiError ? 'ai-food-error' : undefined}
+                     className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none"
+                   />
+                   <Button onClick={handleAiParse} disabled={isAiLoading || !aiInput}>{isAiLoading ? 'Adding…' : 'Add'}</Button>
                  </div>
+                 {aiError && (
+                   <p id="ai-food-error" role="alert" className="mt-2 text-sm text-fat">{aiError}</p>
+                 )}
               </div>
             </div>
           )}

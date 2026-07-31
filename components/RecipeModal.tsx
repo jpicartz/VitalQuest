@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from './ui/Button';
 import { MealSuggestion, UserProfile } from '../types';
-import { generateRecipe } from '../services/claudeService';
+import { generateRecipe, type RecipeData } from '../services/claudeService';
 import { IconX } from '@tabler/icons-react';
 
 interface RecipeModalProps {
@@ -9,15 +9,6 @@ interface RecipeModalProps {
   profile: UserProfile;
   onClose: () => void;
   onAddToLog: () => void;
-}
-
-interface RecipeData {
-  prepTime?: string;
-  cookTime?: string;
-  servings?: number;
-  ingredients: { amount: string; item: string }[];
-  steps: string[];
-  tips?: string;
 }
 
 export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose, onAddToLog }) => {
@@ -31,8 +22,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose
       setIsLoading(true);
       setError(null);
       try {
-        const raw = await generateRecipe(meal.name, meal.ingredients, profile);
-        const data = JSON.parse(raw) as RecipeData;
+        const data = await generateRecipe(meal.name, meal.ingredients, profile);
         if (!cancelled) setRecipe(data);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load recipe');

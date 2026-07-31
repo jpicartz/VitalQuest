@@ -29,6 +29,21 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
   return (
     <div className="space-y-6 animate-fade-in-up">
 
+      {/* Honesty: never let an API failure read as personalised advice. */}
+      {plan.isFallback && (
+        <div className="bg-spark/10 border border-spark/30 rounded-card p-4 flex gap-3 items-start text-sm">
+          <IconAlertTriangle size={20} className="text-spark shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-fg block mb-1">Showing general guidance</strong>
+            <span className="text-fg-soft">
+              We couldn't reach the AI to build your personalised plan, so this is
+              generic starter advice — it is not based on your profile. Use “Start
+              Over” to try again.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Summary Section */}
       <section className="rounded-modal p-8 text-white shadow-lg" style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)' }}>
         <h2 className="text-2xl font-extrabold mb-4">Your Path Forward</h2>
@@ -77,11 +92,11 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
           </div>
           <p className="text-fg-soft mb-6 font-medium">{plan.nutritionFocus}</p>
 
-          {plan.nutritionGaps.length > 0 && (
+          {(plan.nutritionGaps?.length ?? 0) > 0 && (
             <div className="bg-card rounded-tile p-4 border border-edge">
               <h4 className="text-sm font-semibold text-fg-mute uppercase tracking-wider mb-2">Watch out for gaps</h4>
               <ul className="list-disc list-inside text-fg-soft space-y-1">
-                {plan.nutritionGaps.map((gap, i) => (
+                {plan.nutritionGaps?.map((gap, i) => (
                   <li key={i}>{gap}</li>
                 ))}
               </ul>
@@ -98,13 +113,15 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
           <p className="text-xs text-fg-mute mb-4">
             Supplements are secondary to food. Only considered if evidence-based and safe for you.
           </p>
-          {plan.safeSupplements.length === 0 ? (
+          {(plan.safeSupplements?.length ?? 0) === 0 ? (
              <div className="p-4 bg-nutri/10 text-fg rounded-tile text-center text-sm">
-               Great news! Based on your profile, you likely don't need any specific supplements right now. Focus on whole foods.
+               {plan.isFallback
+                 ? "No supplement guidance is available offline. Reconnect and start over for a personalised review, and talk to a clinician before starting anything new."
+                 : "Great news! Based on your profile, you likely don't need any specific supplements right now. Focus on whole foods."}
              </div>
           ) : (
             <div>
-              {plan.safeSupplements.map((supp, i) => (
+              {plan.safeSupplements?.map((supp, i) => (
                 <SupplementCard key={i} supp={supp} />
               ))}
             </div>

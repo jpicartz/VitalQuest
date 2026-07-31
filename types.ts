@@ -88,6 +88,10 @@ export interface WellnessPlan {
   safeSupplements: SupplementRecommendation[];
   dailyQuests: Habit[];
   safetyDisclaimer: string; // AI generated context-specific disclaimer
+  /** True when the AI call failed and this is generic offline guidance,
+   *  not advice generated from the user's profile. Surfaced in the UI so a
+   *  network error is never mistaken for a personalized recommendation. */
+  isFallback?: boolean;
 }
 
 export interface GamificationState {

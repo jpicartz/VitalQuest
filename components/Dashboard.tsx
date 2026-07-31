@@ -95,8 +95,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onUpdateGamification(newState, 1);
   };
 
+  // The plan comes from the AI, so never assume its arrays are present.
+  const dailyQuests = plan.dailyQuests ?? [];
+
   const calculateProgress = () => {
-    const total = plan.dailyQuests.length;
+    const total = dailyQuests.length;
     const completed = gamification.completedQuestIds.length;
     return total === 0 ? 0 : Math.round((completed / total) * 100);
   };
@@ -185,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             quests: { label: 'Quests', Icon: IconTrophy },
             progress: { label: 'Progress', Icon: IconActivity },
           }[tab];
-          const remaining = plan.dailyQuests.length - gamification.completedQuestIds.length;
+          const remaining = dailyQuests.length - gamification.completedQuestIds.length;
           return (
             <button
               key={tab}
@@ -243,7 +246,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="h-full bg-nutri rounded-full transition-all duration-700 ease-out" style={{ width: `${calculateProgress()}%` }} />
           </div>
           <div className="grid gap-3">
-            {plan.dailyQuests.map((quest) => {
+            {dailyQuests.map((quest) => {
               const isCompleted = gamification.completedQuestIds.includes(quest.id);
               return (
                 <div

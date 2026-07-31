@@ -115,21 +115,27 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold text-fg">Let's start with the basics</h2>
             <div>
-              <label className="block text-sm font-semibold text-fg-soft mb-2">Age</label>
+              <label htmlFor="onboarding-age" className="block text-sm font-semibold text-fg-soft mb-2">Age</label>
               <input
+                id="onboarding-age"
                 type="number"
+                inputMode="numeric"
+                min={LIMITS.age.min}
+                max={LIMITS.age.max}
                 value={profile.age || ''}
                 onChange={e => updateProfile('age', parseInt(e.target.value))}
                 className={inputClass}
                 placeholder="Years"
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-fg-soft mb-2">Gender</label>
+            <div role="group" aria-labelledby="onboarding-gender-label">
+              <span id="onboarding-gender-label" className="block text-sm font-semibold text-fg-soft mb-2">Gender</span>
               <div className="flex gap-2">
                 {[Gender.Male, Gender.Female, Gender.PreferNotToSay].map(g => (
                   <button
                     key={g}
+                    type="button"
+                    aria-pressed={profile.gender === g}
                     onClick={() => updateProfile('gender', g)}
                     className={`flex-1 py-3 rounded-control border-2 font-medium transition-colors ${
                       profile.gender === g
@@ -152,16 +158,20 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
             {/* Height Section */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                 <label className="block text-sm font-semibold text-fg-soft">Height</label>
+                 <label htmlFor="onboarding-height" className="block text-sm font-semibold text-fg-soft">Height</label>
                  <div className="flex bg-raised rounded-lg p-1">
-                    <button onClick={() => handleUnitChange('height', 'cm')} className={unitBtn(heightUnit === 'cm')}>CM</button>
-                    <button onClick={() => handleUnitChange('height', 'ft')} className={unitBtn(heightUnit === 'ft')}>FT</button>
+                    <button type="button" aria-pressed={heightUnit === 'cm'} onClick={() => handleUnitChange('height', 'cm')} className={unitBtn(heightUnit === 'cm')}>CM</button>
+                    <button type="button" aria-pressed={heightUnit === 'ft'} onClick={() => handleUnitChange('height', 'ft')} className={unitBtn(heightUnit === 'ft')}>FT</button>
                  </div>
               </div>
 
               {heightUnit === 'cm' ? (
                 <input
+                  id="onboarding-height"
                   type="number"
+                  inputMode="numeric"
+                  min={LIMITS.heightCm.min}
+                  max={LIMITS.heightCm.max}
                   value={profile.heightCm || ''}
                   onChange={e => updateProfile('heightCm', parseInt(e.target.value))}
                   className={inputClass}
@@ -171,21 +181,30 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
                 <div className="flex gap-4">
                    <div className="flex-1">
                      <input
+                        id="onboarding-height"
                         type="number"
+                        inputMode="numeric"
+                        min={3}
+                        max={8}
                         value={feet}
                         onChange={e => handleImperialHeightChange(e.target.value, inches)}
                         className={inputClass}
                         placeholder="5"
+                        aria-label="Height in feet"
                       />
                       <span className="text-xs text-fg-mute mt-1 ml-1">Feet</span>
                    </div>
                    <div className="flex-1">
                      <input
                         type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={11}
                         value={inches}
                         onChange={e => handleImperialHeightChange(feet, e.target.value)}
                         className={inputClass}
                         placeholder="10"
+                        aria-label="Height in inches"
                       />
                       <span className="text-xs text-fg-mute mt-1 ml-1">Inches</span>
                    </div>
@@ -196,16 +215,20 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
             {/* Weight Section */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                 <label className="block text-sm font-semibold text-fg-soft">Weight</label>
+                 <label htmlFor="onboarding-weight" className="block text-sm font-semibold text-fg-soft">Weight</label>
                  <div className="flex bg-raised rounded-lg p-1">
-                    <button onClick={() => handleUnitChange('weight', 'kg')} className={unitBtn(weightUnit === 'kg')}>KG</button>
-                    <button onClick={() => handleUnitChange('weight', 'lbs')} className={unitBtn(weightUnit === 'lbs')}>LBS</button>
+                    <button type="button" aria-pressed={weightUnit === 'kg'} onClick={() => handleUnitChange('weight', 'kg')} className={unitBtn(weightUnit === 'kg')}>KG</button>
+                    <button type="button" aria-pressed={weightUnit === 'lbs'} onClick={() => handleUnitChange('weight', 'lbs')} className={unitBtn(weightUnit === 'lbs')}>LBS</button>
                  </div>
               </div>
 
               {weightUnit === 'kg' ? (
                 <input
+                  id="onboarding-weight"
                   type="number"
+                  inputMode="decimal"
+                  min={LIMITS.weightKg.min}
+                  max={LIMITS.weightKg.max}
                   value={profile.weightKg || ''}
                   onChange={e => updateProfile('weightKg', parseFloat(e.target.value))}
                   className={inputClass}
@@ -213,7 +236,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
                 />
               ) : (
                 <input
+                  id="onboarding-weight"
                   type="number"
+                  inputMode="decimal"
+                  min={66}
+                  max={660}
                   value={pounds}
                   onChange={e => handlePoundsChange(e.target.value)}
                   className={inputClass}
@@ -228,8 +255,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold text-fg">Your Goals & Lifestyle</h2>
             <div>
-              <label className="block text-sm font-semibold text-fg-soft mb-2">Main Goal</label>
+              <label htmlFor="onboarding-goal" className="block text-sm font-semibold text-fg-soft mb-2">Main Goal</label>
               <select
+                id="onboarding-goal"
                 value={profile.goal}
                 onChange={e => updateProfile('goal', e.target.value)}
                 className={`${inputClass} bg-card`}
@@ -239,11 +267,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
             </div>
 
             <div className="bg-raised p-4 rounded-card border border-edge">
-                <label className="block text-sm font-bold text-fg mb-4 uppercase tracking-wider">Activity Level</label>
+                <span className="block text-sm font-bold text-fg mb-4 uppercase tracking-wider">Activity Level</span>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-xs font-semibold text-fg-soft mb-1">General Activity</label>
+                        <label htmlFor="onboarding-activity" className="block text-xs font-semibold text-fg-soft mb-1">General Activity</label>
                         <select
+                            id="onboarding-activity"
                             value={profile.activityLevel}
                             onChange={e => updateProfile('activityLevel', e.target.value)}
                             className={`${inputClass} bg-card`}
@@ -253,12 +282,16 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-fg-soft mb-1">
+                        <label htmlFor="onboarding-steps" className="block text-xs font-semibold text-fg-soft mb-1">
                             Approx. Daily Steps (Optional)
                             <span className="font-normal text-fg-mute ml-1">- Helps fine-tune accuracy</span>
                         </label>
                         <input
+                            id="onboarding-steps"
                             type="number"
+                            inputMode="numeric"
+                            min={0}
+                            max={50000}
                             value={profile.dailySteps || ''}
                             onChange={e => updateProfile('dailySteps', parseInt(e.target.value))}
                             className={`${inputClass} bg-card`}
@@ -269,9 +302,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-fg-soft mb-2">Sleep (Avg Hours)</label>
+              <label htmlFor="onboarding-sleep" className="block text-sm font-semibold text-fg-soft mb-2">Sleep (Avg Hours)</label>
                <input
+                id="onboarding-sleep"
                 type="number"
+                inputMode="numeric"
+                min={LIMITS.sleepHours.min}
+                max={LIMITS.sleepHours.max}
                 value={profile.sleepHours || ''}
                 onChange={e => updateProfile('sleepHours', parseInt(e.target.value))}
                 className={inputClass}
@@ -285,12 +322,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
            <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold text-fg">Final Safety Checks</h2>
 
-            <div>
-              <label className="block text-sm font-semibold text-fg-soft mb-2">Dietary Restrictions</label>
+            <div role="group" aria-labelledby="onboarding-restrictions-label">
+              <span id="onboarding-restrictions-label" className="block text-sm font-semibold text-fg-soft mb-2">Dietary Restrictions</span>
               <div className="flex flex-wrap gap-2">
                 {Object.values(DietaryRestriction).map(r => (
                   <button
                     key={r}
+                    type="button"
+                    aria-pressed={profile.dietaryRestrictions?.includes(r) ?? false}
                     onClick={() => toggleRestriction(r)}
                     className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-colors ${
                       profile.dietaryRestrictions?.includes(r)
@@ -305,11 +344,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-fg-soft mb-2">
+              <label htmlFor="onboarding-medical" className="block text-sm font-semibold text-fg-soft mb-2">
                 Medical Conditions / Medications
-                <span className="block text-xs font-normal text-fg-mute">Optional. Enter "None" if healthy. If you are pregnant or have a chronic condition, please list it here so we can keep recommendations safe.</span>
+                <span className="block text-xs font-normal text-fg-mute">Optional. Enter "None" if healthy. If you are pregnant or have a chronic condition, list it here — it is sent to the AI so it can screen suggestions against it.</span>
               </label>
               <textarea
+                id="onboarding-medical"
                 value={profile.medicationsOrConditions || ''}
                 onChange={e => updateProfile('medicationsOrConditions', e.target.value)}
                 className={`${inputClass} text-base`}
@@ -317,16 +357,57 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
                 rows={3}
               />
             </div>
+
+            {/* Shown before the user ever sees generated advice, not after. */}
+            <div className="bg-raised border border-edge rounded-card p-4 text-xs text-fg-soft leading-relaxed">
+              <strong className="text-fg block mb-1">Before you continue</strong>
+              VitalQuest gives general wellness information generated by AI. It is
+              not medical advice, diagnosis, or treatment, and it can be wrong —
+              talk to a qualified healthcare professional before changing your diet,
+              starting a supplement, or altering any medication. Your answers are
+              stored in this browser and sent to Anthropic's API to generate your plan.
+            </div>
           </div>
         );
       default: return null;
     }
   };
 
+  // Plausible-human bounds. Without an upper/lower bound a negative or absurd
+  // value flows straight into the BMR/TDEE/macro math and renders as negative
+  // calorie and water targets across the app.
+  const LIMITS = {
+    age: { min: 13, max: 100 },
+    heightCm: { min: 100, max: 250 },
+    weightKg: { min: 30, max: 300 },
+    sleepHours: { min: 3, max: 14 },
+  } as const;
+
+  const inRange = (v: number | undefined, k: keyof typeof LIMITS) =>
+    typeof v === 'number' && Number.isFinite(v) && v >= LIMITS[k].min && v <= LIMITS[k].max;
+
+  const stepError = (): string | null => {
+    if (step === 0 && profile.age !== undefined && !inRange(profile.age, 'age')) {
+      return `Please enter an age between ${LIMITS.age.min} and ${LIMITS.age.max}.`;
+    }
+    if (step === 1) {
+      if (profile.heightCm !== undefined && !inRange(profile.heightCm, 'heightCm')) {
+        return `Please enter a height between ${LIMITS.heightCm.min} and ${LIMITS.heightCm.max} cm.`;
+      }
+      if (profile.weightKg !== undefined && !inRange(profile.weightKg, 'weightKg')) {
+        return `Please enter a weight between ${LIMITS.weightKg.min} and ${LIMITS.weightKg.max} kg.`;
+      }
+    }
+    if (step === 2 && profile.sleepHours !== undefined && !inRange(profile.sleepHours, 'sleepHours')) {
+      return `Please enter sleep between ${LIMITS.sleepHours.min} and ${LIMITS.sleepHours.max} hours.`;
+    }
+    return null;
+  };
+
   const isStepValid = () => {
-    if (step === 0) return profile.age && profile.age > 0;
-    if (step === 1) return profile.heightCm && profile.weightKg;
-    if (step === 2) return profile.goal && profile.activityLevel && profile.sleepHours;
+    if (step === 0) return inRange(profile.age, 'age');
+    if (step === 1) return inRange(profile.heightCm, 'heightCm') && inRange(profile.weightKg, 'weightKg');
+    if (step === 2) return !!profile.goal && !!profile.activityLevel && inRange(profile.sleepHours, 'sleepHours');
     return true;
   };
 
@@ -341,6 +422,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
 
       <div className="bg-card rounded-modal p-8 shadow-xl dark:shadow-none border border-edge min-h-[400px] flex flex-col justify-between">
         {renderStep()}
+
+        {stepError() && (
+          <p role="alert" className="mt-6 text-sm text-fat">{stepError()}</p>
+        )}
 
         <div className="flex gap-4 mt-8 pt-6 border-t border-edge">
           {step > 0 && (

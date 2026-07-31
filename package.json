@@ -1,12 +1,21 @@
 {
   "name": "vitalquest",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "An evidence-based, gamified wellness tracker: AI-assisted nutrition logging, micronutrient scoring, and daily quests. React + Vite, with a hardened serverless Claude proxy.",
+  "author": "Juan Picart",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jpicartz/VitalQuest.git"
+  },
+  "homepage": "https://vital-quest-rho.vercel.app",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.45.0",
@@ -18,6 +27,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@vercel/node": "^5.8.22",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.5.4",
