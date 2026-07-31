@@ -33,3 +33,5 @@ dist-ssr
 
 # Claude Code local tooling
 .claude/
+.impeccable/
+.vercel/

@@ -19,12 +19,29 @@ const ALLOWED_MODELS = new Set([
 // reply is ~$0.02).
 const MAX_OUTPUT_TOKENS = 4096;
 const MAX_BODY_BYTES = 32 * 1024; // 32 KB request-body cap
+// The app's own system prompts are a few hundred chars; anything far larger is
+// abuse. Input tokens are cheap per-token but unbounded input is not, and the
+// max_tokens clamp only bounds *output*.
+const MAX_SYSTEM_CHARS = 4000;
 
 // Origins allowed to use the proxy from a browser. Non-browser clients (curl)
 // send no Origin header — those are caught by the rate limit + allowlist.
 const ALLOWED_ORIGINS = new Set([
   'https://vital-quest-rho.vercel.app',
 ]);
+
+// Vercel branch/preview deployments get generated subdomains, which would
+// otherwise 403 on every AI call and make the preview look broken.
+function originAllowed(origin: string): boolean {
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== 'https:') return false;
+    return /^vital-quest[a-z0-9-]*\.vercel\.app$/.test(hostname);
+  } catch {
+    return false;
+  }
+}
 
 // ── Best-effort in-memory rate limit ───────────────────────────────────────
 // Module-level state persists only within a warm serverless instance, so this
@@ -36,6 +53,15 @@ const hits = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
+
+  // Drop expired buckets so a flood of distinct keys can't grow the Map without
+  // bound for the lifetime of a warm instance.
+  if (hits.size > 5000) {
+    for (const [key, rec] of hits) {
+      if (now > rec.resetAt) hits.delete(key);
+    }
+  }
+
   const rec = hits.get(ip);
   if (!rec || now > rec.resetAt) {
     hits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
@@ -43,6 +69,44 @@ function rateLimited(ip: string): boolean {
   }
   rec.count += 1;
   return rec.count > RATE_LIMIT;
+}
+
+// `x-forwarded-for` is caller-supplied and can be spoofed to mint a fresh
+// rate-limit bucket per request. Vercel's own headers are set at the edge and
+// cannot be overridden by the client, so prefer them and treat XFF as a
+// last resort.
+function clientKey(req: VercelRequest): string {
+  const vercelIp = req.headers['x-vercel-forwarded-for'];
+  const realIp = req.headers['x-real-ip'];
+  const pick = (v: string | string[] | undefined) =>
+    (Array.isArray(v) ? v[0] : v || '').split(',')[0].trim();
+  return (
+    pick(vercelIp) ||
+    pick(realIp) ||
+    pick(req.headers['x-forwarded-for']) ||
+    'unknown'
+  );
+}
+
+// The top-level field whitelist doesn't reach inside messages. Anthropic accepts
+// image blocks with a URL source, which would let a caller make Anthropic fetch
+// arbitrary URLs on this key (and bill at image rates), so restrict content to
+// plain text.
+function messagesAreTextOnly(messages: unknown[]): boolean {
+  return messages.every((m) => {
+    if (typeof m !== 'object' || m === null) return false;
+    const { role, content } = m as { role?: unknown; content?: unknown };
+    if (role !== 'user' && role !== 'assistant') return false;
+    if (typeof content === 'string') return true;
+    if (!Array.isArray(content)) return false;
+    return content.every(
+      (block) =>
+        typeof block === 'object' &&
+        block !== null &&
+        (block as { type?: unknown }).type === 'text' &&
+        typeof (block as { text?: unknown }).text === 'string'
+    );
+  });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -59,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Soft same-origin check: block browser cross-site abuse. A missing Origin
   // (server-to-server) is allowed here and handled by the rate limit below.
   const origin = req.headers.origin;
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  if (origin && !originAllowed(origin)) {
     return res.status(403).json({ error: 'Forbidden origin' });
   }
 
@@ -70,8 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Per-IP rate limit
-  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (rateLimited(ip)) {
+  if (rateLimited(clientKey(req))) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 
@@ -91,12 +154,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return res.status(400).json({ error: 'messages required' });
   }
-  // Extra guard on serialised message size (content-length may be absent)
+  if (!messagesAreTextOnly(body.messages)) {
+    return res.status(400).json({ error: 'Only text messages are supported' });
+  }
+  // Extra guard on serialised message size (content-length may be absent under
+  // chunked transfer encoding, so the header check above can be bypassed).
   if (JSON.stringify(body.messages).length > MAX_BODY_BYTES) {
     return res.status(413).json({ error: 'Request too large' });
   }
+  if (typeof body.system === 'string' && body.system.length > MAX_SYSTEM_CHARS) {
+    return res.status(413).json({ error: 'Request too large' });
+  }
 
-  const maxTokens = Math.min(Number(body.max_tokens) || 1024, MAX_OUTPUT_TOKENS);
+  // Clamp on both ends: Math.min alone lets a negative value through.
+  const requested = Number(body.max_tokens);
+  const maxTokens = Math.min(
+    Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : 1024,
+    MAX_OUTPUT_TOKENS
+  );
 
   // Whitelist only the fields we send upstream — drop tools/metadata/etc.
   const upstreamBody: Record<string, unknown> = {
@@ -120,9 +195,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const data = await response.json();
-    return res.status(response.status).json(data);
+
+    if (!response.ok) {
+      // Never echo Anthropic's error body: it reveals whether the key is valid,
+      // whether the account is out of credit, and internal request IDs. Log the
+      // detail server-side and return something generic and actionable.
+      console.error('Claude upstream error:', response.status, JSON.stringify(data).slice(0, 500));
+      const status = response.status === 429 || response.status === 529 ? 503 : 502;
+      return res.status(status).json({
+        error:
+          status === 503
+            ? 'The AI service is busy right now. Please try again in a moment.'
+            : 'The AI service could not complete that request. Please try again.',
+      });
+    }
+
+    return res.status(200).json(data);
   } catch (err) {
     console.error('Claude proxy upstream error:', err);
-    return res.status(502).json({ error: 'Upstream error' });
+    return res.status(502).json({ error: 'The AI service is unreachable. Please try again.' });
   }
 }
