@@ -10,7 +10,11 @@ import { BADGE_MAP, BADGE_DEFINITIONS } from '../data/badgeDefinitions';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { toISODateString } from '../utils/dateUtils';
 import { ScoreRing } from './ui/ScoreRing';
-import { IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl, IconCheck, IconPlus, IconX } from '@tabler/icons-react';
+import { Modal } from './ui/Modal';
+import {
+  IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl, IconCheck, IconPlus, IconX,
+  IconRun, IconWalk, IconBike, IconSwimming, IconBarbell, IconYoga, IconBolt, IconStretching,
+} from '@tabler/icons-react';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -172,7 +176,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 title={b.description}
                 className="inline-flex items-center gap-1.5 bg-spark/10 border border-spark/25 text-fg text-xs font-semibold px-3 py-1.5 rounded-full"
               >
-                <span className="text-sm leading-none">{b.emoji}</span> {b.title}
+                <b.Icon size={14} className="text-spark" /> {b.title}
               </span>
             );
           })}
@@ -180,7 +184,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-raised p-1 rounded-control w-fit mx-auto md:mx-0 overflow-x-auto">
+      <div className="flex gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0 overflow-x-auto">
         {(['plan', 'nutrition', 'quests', 'progress'] as const).map((tab) => {
           const meta = {
             plan: { label: 'My Plan', Icon: IconMap2 },
@@ -200,7 +204,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <meta.Icon size={16} />
               {meta.label}
               {tab === 'quests' && remaining > 0 && (
-                <span className="nums ml-0.5 bg-nutri text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
+                <span className="nums ml-0.5 bg-nutri-strong text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
               )}
             </button>
           );
@@ -258,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       : 'bg-card border-edge hover:border-nutri/50 cursor-pointer shadow-sm dark:shadow-none'
                   }`}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${isCompleted ? 'bg-nutri text-white' : 'border-2 border-edge'}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${isCompleted ? 'bg-nutri-strong text-white' : 'border-2 border-edge'}`}>
                     {isCompleted && <IconCheck size={16} stroke={3} />}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -328,9 +332,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const today = toISODateString();
             const todayExercise = exerciseLogs.filter(e => e.date === today);
             const todayXp = todayExercise.reduce((s, e) => s + e.xpEarned, 0);
-            const EXERCISE_ICONS: Record<string, string> = {
-              Running: '🏃', Walking: '🚶', Cycling: '🚴', Swimming: '🏊',
-              'Strength Training': '🏋️', Yoga: '🧘', HIIT: '⚡', Other: '💪',
+            const EXERCISE_ICONS: Record<string, typeof IconRun> = {
+              Running: IconRun, Walking: IconWalk, Cycling: IconBike, Swimming: IconSwimming,
+              'Strength Training': IconBarbell, Yoga: IconYoga, HIIT: IconBolt, Other: IconStretching,
             };
             return (
               <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
@@ -341,7 +345,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                   <button
                     onClick={() => { setExType('Running'); setExDuration(''); setExNotes(''); setIsLoggingExercise(true); }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-nutri text-white dark:text-[#08210f] text-sm font-bold rounded-control hover:brightness-[1.05] transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-nutri-strong text-white dark:text-[#08210f] text-sm font-bold rounded-control hover:brightness-[1.05] transition-all"
                   >
                     <IconPlus size={16} stroke={2.5} /> Log
                   </button>
@@ -350,17 +354,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <p className="text-sm text-fg-mute italic">No exercise logged today. Keep moving!</p>
                 ) : (
                   <div className="space-y-2">
-                    {todayExercise.map(e => (
+                    {todayExercise.map(e => {
+                      const ExIcon = EXERCISE_ICONS[e.type] ?? IconStretching;
+                      return (
                       <div key={e.id} className="flex items-center gap-3 p-3 bg-raised rounded-tile border border-edge">
-                        <span className="text-xl">{EXERCISE_ICONS[e.type] ?? '💪'}</span>
+                        <ExIcon size={22} className="text-nutri shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-fg text-sm">{e.type}</p>
                           <p className="nums text-xs text-fg-mute">{e.durationMin} min{e.notes ? ` · ${e.notes}` : ''}</p>
                         </div>
                         <span className="nums text-xs font-bold text-spark bg-spark/10 px-2 py-1 rounded-lg shrink-0">+{e.xpEarned} XP</span>
-                        <button onClick={() => onDeleteExercise(e.id)} aria-label="Delete" className="text-fg-mute hover:text-fat transition-colors ml-1"><IconX size={16} /></button>
+                        <button onClick={() => onDeleteExercise(e.id)} aria-label={`Delete ${e.type} entry`} className="text-fg-mute hover:text-fat transition-colors ml-1"><IconX size={16} /></button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -379,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   if (!b) return null;
                   return (
                     <div key={id} className="flex flex-col items-center gap-1 p-4 rounded-tile bg-spark/10 border border-spark/25 text-center">
-                      <span className="text-3xl">{b.emoji}</span>
+                      <b.Icon size={30} className="text-spark" stroke={1.75} />
                       <span className="font-bold text-fg text-sm">{b.title}</span>
                       <span className="text-xs text-fg-soft">{b.description}</span>
                     </div>
@@ -397,8 +404,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <p className="text-xs font-semibold text-fg-mute uppercase tracking-wider mb-3">Locked</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {locked.map(b => (
-                      <div key={b.id} className="flex flex-col items-center gap-1 p-4 rounded-tile bg-raised border border-edge text-center opacity-50 grayscale">
-                        <span className="text-3xl">{b.emoji}</span>
+                      <div key={b.id} className="flex flex-col items-center gap-1 p-4 rounded-tile bg-raised border border-edge text-center opacity-60">
+                        <b.Icon size={30} className="text-fg-mute" stroke={1.75} />
                         <span className="font-bold text-fg text-sm">{b.title}</span>
                         <span className="text-xs text-fg-soft">{b.description}</span>
                       </div>
@@ -435,9 +442,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ── Exercise log modal ── */}
       {isLoggingExercise && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setIsLoggingExercise(false)}>
-          <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-fg">Log Exercise</h3>
+        <Modal onClose={() => setIsLoggingExercise(false)} labelledBy="exercise-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <h3 id="exercise-modal-title" className="text-xl font-bold text-fg">Log Exercise</h3>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Type</label>
@@ -488,21 +494,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Save
               </Button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {showStartOverConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowStartOverConfirm(false)}>
-          <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-fg">Start Over?</h3>
+        <Modal
+          onClose={() => setShowStartOverConfirm(false)}
+          labelledBy="startover-modal-title"
+          className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4"
+        >
+            <h3 id="startover-modal-title" className="text-xl font-bold text-fg">Start Over?</h3>
             <p className="text-sm text-fg-soft">All your data will be permanently deleted.</p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowStartOverConfirm(false)}>Cancel</Button>
-              <Button variant="primary" className="flex-1 bg-red-500 hover:brightness-105" onClick={onReset}>Yes, Start Over</Button>
+              <Button variant="primary" className="flex-1 bg-fat hover:brightness-105" onClick={onReset}>Yes, Start Over</Button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

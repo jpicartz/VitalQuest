@@ -7,11 +7,8 @@ import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, PRIORIT
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
-// @ts-ignore
-import html2canvas from 'html2canvas';
-// @ts-ignore
-import { jsPDF } from 'jspdf';
 import { RecipeModal } from './RecipeModal';
+import { Modal } from './ui/Modal';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
@@ -86,6 +83,8 @@ const [recipeModal, setRecipeModal] = useState<MealSuggestion | null>(null);
 const [isAddingWater, setIsAddingWater] = useState(false);
 const [waterInput, setWaterInput] = useState('');
 const [showFavourites, setShowFavourites] = useState(false);
+const [isExporting, setIsExporting] = useState(false);
+const [exportError, setExportError] = useState<string | null>(null);
 const [favMealType, setFavMealType] = useState<MealType>('Breakfast');
 
 // Water goal: 35 ml/kg capped at 3500 ml
@@ -198,7 +197,7 @@ const isViewingToday = selectedDate === toISODateString();
            const vitD = Math.round(val * 0.7); 
            const sunItem: FoodItem = {
                id: `sun-${Date.now()}`,
-               name: '☀️ Sunlight Exposure',
+               name: 'Sunlight Exposure',
                servingSize: `${val} mins`,
                calories: 0,
                protein: 0,
@@ -260,23 +259,50 @@ const isViewingToday = selectedDate === toISODateString();
 
   const handleExportPDF = async () => {
     if (!reportRef.current) return;
+    setIsExporting(true);
+    setExportError(null);
     try {
+      // Loaded on demand: html2canvas + jspdf are ~200 KB gzipped and this is a
+      // rarely-used action, so they shouldn't sit in the initial bundle.
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
       const canvas = await html2canvas(reportRef.current, { scale: 2 });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save('nutrition-report.pdf');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      // The report is far taller than one A4 page, so walk down the image one
+      // page at a time instead of clipping everything past the first page.
+      let remaining = imgHeight;
+      let offset = 0;
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight);
+      remaining -= pageHeight;
+      while (remaining > 0) {
+        offset -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, offset, pageWidth, imgHeight);
+        remaining -= pageHeight;
+      }
+
+      pdf.save(`vitalquest-report-${selectedDate}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
+      setExportError("Couldn't generate the PDF. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-1 bg-raised p-1 rounded-control w-fit overflow-x-auto">
+      {/* wraps instead of squashing the sub-tabs against the reset button on phones */}
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <div className="flex gap-1 bg-raised p-1 rounded-control w-fit max-w-full overflow-x-auto">
             <button onClick={() => setActiveTab('log')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'log' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Food Log</button>
             <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Trends</button>
             <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Analysis</button>
@@ -289,10 +315,9 @@ const isViewingToday = selectedDate === toISODateString();
       </div>
 
       {showResetConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowResetConfirm(false)}>
-          <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setShowResetConfirm(false)} labelledBy="reset-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-bold text-fg">Reset Today's Log?</h3>
+                <h3 id="reset-modal-title" className="text-xl font-bold text-fg">Reset Today's Log?</h3>
                 <button onClick={() => setShowResetConfirm(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
              </div>
              <p className="text-sm text-fg-soft">
@@ -307,8 +332,7 @@ const isViewingToday = selectedDate === toISODateString();
                   Yes, Reset
                </Button>
              </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {activeTab === 'log' && (
@@ -428,7 +452,7 @@ const isViewingToday = selectedDate === toISODateString();
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => onQuickAddFavourite(food, favMealType)}
-                                className="inline-flex items-center gap-1 text-xs font-bold bg-nutri text-white dark:text-[#08210f] px-3 py-1.5 rounded-control hover:brightness-[1.05] transition-all"
+                                className="inline-flex items-center gap-1 text-xs font-bold bg-nutri-strong text-white dark:text-[#08210f] px-3 py-1.5 rounded-control hover:brightness-[1.05] transition-all"
                               ><IconPlus size={14} stroke={2.5} /> Add</button>
                               <button
                                 onClick={() => onRemoveFavourite(food.id)}
@@ -600,10 +624,18 @@ const isViewingToday = selectedDate === toISODateString();
 
       {activeTab === 'analysis' && (
         <div className="animate-fade-in space-y-8">
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={handleExportPDF} className="inline-flex items-center gap-1.5 text-sm font-bold">
-              <IconFileText size={16} /> Export PDF
+          <div className="flex flex-col items-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 text-sm font-bold"
+            >
+              <IconFileText size={16} /> {isExporting ? 'Preparing…' : 'Export PDF'}
             </Button>
+            {exportError && (
+              <p role="alert" className="text-sm text-fat">{exportError}</p>
+            )}
           </div>
           <div ref={reportRef} className="space-y-8">
 
@@ -758,35 +790,35 @@ const isViewingToday = selectedDate === toISODateString();
               </div>
            </section>
 
-           <section className="rounded-3xl border shadow-sm overflow-hidden">
+           <section className="rounded-card border border-edge shadow-sm dark:shadow-none overflow-hidden">
               {nutrientGaps.length > 0 ? (
                 <>
-                  <div className="bg-gradient-to-r from-amber-500 to-red-500 px-6 py-4">
+                  <div className="bg-gradient-to-r from-spark to-fat px-6 py-4">
                     <h3 className="text-lg font-bold text-white">What You&apos;re Missing Today</h3>
-                    <p className="text-sm text-white/80 mt-1">
+                    <p className="text-sm text-white/85 mt-1">
                       Priority nutrients below 50% of your daily target
                     </p>
                   </div>
-                  <div className="bg-amber-50/80 p-6 space-y-4">
+                  <div className="bg-spark/5 p-6 space-y-4">
                     {nutrientGaps.map(({ key, displayPct, sources }) => (
                       <div
                         key={key}
-                        className="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm"
+                        className="bg-card p-4 rounded-tile border border-edge shadow-sm dark:shadow-none"
                       >
                         <div className="flex justify-between items-start gap-3 mb-3">
-                          <h4 className="font-bold text-amber-900">{key}</h4>
-                          <span className="text-sm font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 shrink-0">
+                          <h4 className="font-bold text-fg">{key}</h4>
+                          <span className="nums text-sm font-black text-fat bg-fat/10 px-2.5 py-1 rounded-control border border-fat/20 shrink-0">
                             {displayPct} DV
                           </span>
                         </div>
-                        <p className="text-xs font-bold text-amber-700/70 uppercase tracking-wider mb-2">
+                        <p className="text-xs font-bold text-fg-mute uppercase tracking-wider mb-2">
                           Top food sources
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {sources.map((source, idx) => (
                             <span
                               key={idx}
-                              className="text-sm font-semibold text-amber-900 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200"
+                              className="text-sm font-semibold text-fg bg-raised px-3 py-1.5 rounded-control border border-edge"
                             >
                               {source}
                             </span>
@@ -814,10 +846,9 @@ const isViewingToday = selectedDate === toISODateString();
         </div>
       )}
       {selectedNutrient && NUTRIENT_INFO[selectedNutrient] && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setSelectedNutrient(null)}>
-          <div className="bg-card rounded-modal p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setSelectedNutrient(null)} labelledBy="nutrient-modal-title" className="bg-card rounded-modal p-6 max-w-md w-full shadow-2xl">
             <div className="flex justify-between items-start mb-4">
-               <h3 className="text-2xl font-bold text-fg">{selectedNutrient}</h3>
+               <h3 id="nutrient-modal-title" className="text-2xl font-bold text-fg">{selectedNutrient}</h3>
                <button onClick={() => setSelectedNutrient(null)} aria-label="Close" className="text-fg-mute hover:text-fg p-1"><IconX size={20} /></button>
             </div>
             <div className="space-y-6">
@@ -845,14 +876,12 @@ const isViewingToday = selectedDate === toISODateString();
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       {isAddingSunlight && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setIsAddingSunlight(false)}>
-            <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setIsAddingSunlight(false)} labelledBy="sunlight-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
                  <div className="flex justify-between items-center">
-                    <h3 className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconSun size={20} className="text-spark" /> Log Sunlight</h3>
+                    <h3 id="sunlight-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconSun size={20} className="text-spark" /> Log Sunlight</h3>
                     <button onClick={() => setIsAddingSunlight(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
                  </div>
                  <p className="text-sm text-fg-soft">
@@ -873,14 +902,12 @@ const isViewingToday = selectedDate === toISODateString();
                  <Button variant="primary" className="bg-spark hover:brightness-105 w-full" onClick={handleSaveSunlight}>
                     Add Vitamin D
                  </Button>
-            </div>
-        </div>
+        </Modal>
       )}
       {isAddingWater && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setIsAddingWater(false)}>
-          <div className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setIsAddingWater(false)} labelledBy="water-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconDroplet size={20} className="text-hydro" /> Log Water</h3>
+              <h3 id="water-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconDroplet size={20} className="text-hydro" /> Log Water</h3>
               <button onClick={() => setIsAddingWater(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
             </div>
             <div>
@@ -898,14 +925,12 @@ const isViewingToday = selectedDate === toISODateString();
             <Button variant="primary" className="bg-hydro hover:brightness-105 w-full" onClick={handleCustomWater}>
               Add Water
             </Button>
-          </div>
-        </div>
+        </Modal>
       )}
       {isMealBuilderOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setIsMealBuilderOpen(false)}>
-          <div className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setIsMealBuilderOpen(false)} labelledBy="mealbuilder-modal-title" className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="inline-flex items-center gap-2 text-2xl font-bold text-fg"><IconSparkles size={22} className="text-nutri" /> Smart Meal Builder</h3>
+              <h3 id="mealbuilder-modal-title" className="inline-flex items-center gap-2 text-2xl font-bold text-fg"><IconSparkles size={22} className="text-nutri" /> Smart Meal Builder</h3>
               <button onClick={() => setIsMealBuilderOpen(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={22} /></button>
             </div>
             <div className="mb-6">
@@ -959,8 +984,7 @@ const isViewingToday = selectedDate === toISODateString();
                 </div>
               </div>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
 {recipeModal && (
         <RecipeModal

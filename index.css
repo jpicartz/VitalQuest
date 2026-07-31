@@ -11,11 +11,16 @@
     --surface-page: 242 241 238;   /* #f2f1ee warm neutral */
     --surface-card: 255 255 255;   /* #ffffff */
     --surface-raised: 248 248 246; /* #f8f8f6 */
-    --fg: 28 28 30;                /* #1c1c1e */
-    --fg-soft: 138 138 142;        /* #8a8a8e */
-    --fg-mute: 176 174 168;        /* #b0aea8 */
+    --fg: 28 28 30;                /* #1c1c1e  17.0:1 on card */
+    --fg-soft: 83 88 95;           /* #53585f  6.4:1 on page — body copy */
+    --fg-mute: 100 105 117;        /* #646975  4.9:1 on page — captions, placeholders */
     --edge: 230 227 221;           /* #e6e3dd */
-    --nutri: 22 163 74;            /* #16a34a nutrition/accent */
+    --nutri: 22 163 74;            /* #16a34a nutrition/accent (marks, tints, borders) */
+    /* Accent variant dark enough to carry white text at AA. The plain --nutri
+       is only 3.3:1 against white, which fails for button labels and the 10px
+       quest badge. Dark mode needs no shift: it pairs light green with dark text. */
+    --nutri-strong: 21 128 61;     /* #15803d  5.0:1 with white */
+    --hydro-strong: 3 105 161;     /* #0369a1  5.9:1 with white (--hydro is 2.8:1) */
     --hydro: 14 165 233;           /* #0ea5e9 water */
     --spark: 245 158 11;           /* #f59e0b streak/XP/energy */
     --macro-protein: 22 163 74;    /* #16a34a */
@@ -29,10 +34,12 @@
     --surface-card: 19 28 46;      /* #131c2e */
     --surface-raised: 26 36 56;    /* #1a2438 */
     --fg: 248 250 252;             /* #f8fafc */
-    --fg-soft: 148 163 184;        /* #94a3b8 */
-    --fg-mute: 100 116 139;        /* #64748b */
+    --fg-soft: 148 163 184;        /* #94a3b8  7.3:1 on page */
+    --fg-mute: 133 147 168;        /* #8593a8  6.0:1 on page (was #64748b, 3.3:1 on raised) */
     --edge: 30 41 59;              /* #1e293b */
     --nutri: 74 222 128;           /* #4ade80 */
+    --nutri-strong: 74 222 128;    /* same as --nutri; dark mode pairs it with dark text */
+    --hydro-strong: 56 189 248;    /* same as --hydro; dark mode pairs it with dark text */
     --hydro: 56 189 248;           /* #38bdf8 */
     --spark: 251 191 36;           /* #fbbf24 */
     --macro-protein: 74 222 128;   /* #4ade80 */

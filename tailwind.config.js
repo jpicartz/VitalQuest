@@ -22,8 +22,15 @@ export default {
           mute: withAlpha('--fg-mute'),
         },
         edge: withAlpha('--edge'),
-        nutri: withAlpha('--nutri'),
-        hydro: withAlpha('--hydro'),
+        nutri: {
+          DEFAULT: withAlpha('--nutri'),
+          // Use for any surface that carries white text — see index.css.
+          strong: withAlpha('--nutri-strong'),
+        },
+        hydro: {
+          DEFAULT: withAlpha('--hydro'),
+          strong: withAlpha('--hydro-strong'),
+        },
         spark: withAlpha('--spark'),
         protein: withAlpha('--macro-protein'),
         carbs: withAlpha('--macro-carbs'),
@@ -47,7 +54,11 @@ export default {
         modal: '20px',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Must match the body rule in index.css. Previously this said 'Inter',
+        // which is no longer loaded, so `font-sans` silently overrode the real
+        // body font with a system fallback.
+        sans: ['Hanken Grotesk', 'system-ui', 'sans-serif'],
+        display: ['Familjen Grotesk', 'Hanken Grotesk', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         'fade-in': {

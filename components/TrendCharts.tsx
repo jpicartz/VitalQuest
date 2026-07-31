@@ -152,7 +152,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({
               </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="grid grid-cols-3 gap-3 w-full md:w-auto flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto flex-1">
               {macroPieData.map((m, i) => (
                 <div
                   key={m.name}

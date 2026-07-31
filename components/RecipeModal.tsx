@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from './ui/Button';
+import { Modal } from './ui/Modal';
 import { MealSuggestion, UserProfile } from '../types';
 import { generateRecipe, type RecipeData } from '../services/claudeService';
 import { IconX } from '@tabler/icons-react';
@@ -34,15 +35,18 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose
   }, [meal, profile]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <Modal
+      onClose={onClose}
+      labelledBy="recipe-modal-title"
+      className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+    >
         <div className="flex justify-between items-start mb-4">
-          <h3 className="text-2xl font-bold text-fg">{meal.name}</h3>
+          <h3 id="recipe-modal-title" className="text-2xl font-bold text-fg">{meal.name}</h3>
           <button onClick={onClose} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={22} /></button>
         </div>
 
         {isLoading && <p className="text-fg-soft py-8 text-center">Generating recipe…</p>}
-        {error && <p className="text-fat py-4">{error}</p>}
+        {error && <p role="alert" className="text-fat py-4">{error}</p>}
 
         {recipe && (
           <div className="space-y-6">
@@ -75,7 +79,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose
             </Button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };

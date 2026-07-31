@@ -88,6 +88,11 @@ export const NutritionInsights: React.FC<NutritionInsightsProps> = ({
               {insights.recommendations.map((r, i) => <li key={i} className="flex items-start gap-2 bg-white/10 px-3 py-2 rounded-control"><IconCheck size={15} stroke={2.5} className="shrink-0 mt-0.5" /> {r}</li>)}
             </ul>
           )}
+          {/* This surface renders AI health guidance, so it carries its own notice. */}
+          <p className="text-[11px] opacity-70 pt-1">
+            AI-generated from your logged data. General wellness information only —
+            not medical advice.
+          </p>
         </div>
       )}
     </div>
