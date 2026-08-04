@@ -3,50 +3,17 @@ import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import {
   UserProfile, CalculatedMetrics, WellnessPlan, GamificationState,
-  ActivityLevel, Goal, MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry,
+  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry,
 } from './types';
 import { generateWellnessPlan } from './services/claudeService';
 import { toISODateString, isSameISODate, timestampForISODate } from './utils/dateUtils';
 import { updateStreak, resetQuestsIfNewDay } from './utils/streakUtils';
 import { checkBadges } from './utils/badgeUtils';
 import { computeMicroScore } from './utils/nutritionAggregates';
+import { calculateMetrics } from './utils/metricsUtils';
 import { IconBolt, IconSun, IconMoon } from '@tabler/icons-react';
 
 type Theme = 'light' | 'dark';
-
-const calculateMetrics = (profile: UserProfile): CalculatedMetrics => {
-  const s = profile.gender === 'Male' ? 5 : -161;
-  const bmr = (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.age) + s;
-  let multiplier = 1.2;
-  if (profile.dailySteps && profile.dailySteps > 0) {
-    if (profile.dailySteps < 5000) multiplier = 1.2;
-    else if (profile.dailySteps < 7500) multiplier = 1.375;
-    else if (profile.dailySteps < 10000) multiplier = 1.55;
-    else if (profile.dailySteps < 15000) multiplier = 1.725;
-    else multiplier = 1.9;
-  } else {
-    switch (profile.activityLevel) {
-      case ActivityLevel.Light: multiplier = 1.375; break;
-      case ActivityLevel.Moderate: multiplier = 1.55; break;
-      case ActivityLevel.VeryActive: multiplier = 1.725; break;
-      case ActivityLevel.ExtraActive: multiplier = 1.9; break;
-      default: multiplier = 1.2;
-    }
-  }
-  let tdee = bmr * multiplier;
-  if (profile.goal === Goal.FatLoss) tdee -= 500;
-  if (profile.goal === Goal.MuscleGain) tdee += 300;
-  const bmi = profile.weightKg / Math.pow(profile.heightCm / 100, 2);
-  const proteinGrams = Math.round(profile.weightKg * (profile.goal === Goal.MuscleGain ? 2.0 : 1.6));
-  const fatGrams = Math.round((tdee * 0.25) / 9);
-  const carbGrams = Math.round((tdee - (proteinGrams * 4) - (fatGrams * 9)) / 4);
-  return {
-    bmi, bmr,
-    tdee: Math.round(tdee),
-    bmiCategory: bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : 'Overweight',
-    macros: { protein: proteinGrams, fat: fatGrams, carbs: carbGrams },
-  };
-};
 
 const initialGamification: GamificationState = {
   xp: 0, level: 1, streak: 0,

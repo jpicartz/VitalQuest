@@ -21,7 +21,10 @@ export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => 
   relevant.forEach(log => {
     if (log.food.micros) {
       Object.entries(log.food.micros).forEach(([key, val]) => {
-        consumed[key] = (consumed[key] || 0) + Number(val || 0);
+        // `Number(val) || 0`, NOT `Number(val || 0)`. The AI sometimes returns
+        // "28g" instead of 28; the latter form yields NaN, which propagates
+        // through the whole score and renders as NaN in the score ring.
+        consumed[key] = (consumed[key] || 0) + (Number(val) || 0);
       });
     }
   });
@@ -31,7 +34,10 @@ export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => 
   PRIORITY_MICROS.forEach(key => {
     const info = NUTRIENT_INFO[key];
     if (!info?.targetVal) return;
-    totalRatio += Math.min((consumed[key] || 0) / info.targetVal, 1);
+    // Clamp each ratio to 0..1 — Math.min alone lets a negative value through
+    // and drags the whole score below zero.
+    const ratio = (consumed[key] || 0) / info.targetVal;
+    totalRatio += Math.max(0, Math.min(ratio, 1));
     count++;
   });
 
@@ -55,13 +61,15 @@ export interface WeeklyMacroTotals {
   fat: number;
 }
 
+// Same NaN guard as computeMicroScore: `Number(x) || 0` coerces a stray
+// "350 kcal" to 0 rather than poisoning every downstream total with NaN.
 const sumDayLogs = (logs: MealLog[]) =>
   logs.reduce(
     (acc, log) => ({
-      calories: acc.calories + Number(log.food.calories || 0),
-      protein: acc.protein + Number(log.food.protein || 0),
-      carbs: acc.carbs + Number(log.food.carbs || 0),
-      fat: acc.fat + Number(log.food.fat || 0),
+      calories: acc.calories + (Number(log.food.calories) || 0),
+      protein: acc.protein + (Number(log.food.protein) || 0),
+      carbs: acc.carbs + (Number(log.food.carbs) || 0),
+      fat: acc.fat + (Number(log.food.fat) || 0),
       mealCount: acc.mealCount + 1,
     }),
     { calories: 0, protein: 0, carbs: 0, fat: 0, mealCount: 0 }
@@ -123,7 +131,10 @@ export const buildInsightsPayload = (
       : 0;
 
   return {
-    period: 'last_7_days',
+    // Derived, not hardcoded — this string is sent to Claude, and the caller
+    // also feeds 14- and 30-day ranges. Saying "last_7_days" for a 30-day
+    // window tells the model the wrong thing about its own input.
+    period: `last_${summaries.length}_days`,
     daysLogged: loggedDays.length,
     calorieTarget,
     proteinTarget,

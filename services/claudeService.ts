@@ -65,7 +65,7 @@ const callClaude = async (system: string, userMsg: string, maxTokens = 1500, mod
   return text.trim();
 };
 
-const parseJsonResponse = (raw: string) => {
+export const parseJsonResponse = (raw: string) => {
   const clean = raw
     .replace(/```json\n?/g, '')
     .replace(/```\n?/g, '')
@@ -158,7 +158,7 @@ Generate 5-6 dailyQuests mixing Nutrition, Sleep, Movement, Mindfulness.`;
 
 // Normalize micro keys from Claude's various formats to the canonical Title Case keys
 // used by NUTRIENT_INFO / PRIORITY_MICROS throughout the app.
-const MICRO_KEY_MAP: Record<string, string> = {
+export const MICRO_KEY_MAP: Record<string, string> = {
   // Fiber / Sugar
   'fiber': 'Fiber', 'dietary fiber': 'Fiber', 'dietary_fiber': 'Fiber',
   'sugar': 'Sugar', 'sugars': 'Sugar',
@@ -193,7 +193,7 @@ const MICRO_KEY_MAP: Record<string, string> = {
   'omega-3': 'Omega-3', 'omega 3': 'Omega-3', 'omega_3': 'Omega-3', 'ala': 'Omega-3',
 };
 
-const normalizeMicros = (raw: Record<string, unknown>): FoodItem['micros'] => {
+export const normalizeMicros = (raw: Record<string, unknown>): FoodItem['micros'] => {
   const result: FoodItem['micros'] = {};
   for (const [key, val] of Object.entries(raw)) {
     const canonical = MICRO_KEY_MAP[key.toLowerCase()] || key; // fall back to original if unknown

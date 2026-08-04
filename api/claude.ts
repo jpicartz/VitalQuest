@@ -32,7 +32,7 @@ const ALLOWED_ORIGINS = new Set([
 
 // Vercel branch/preview deployments get generated subdomains, which would
 // otherwise 403 on every AI call and make the preview look broken.
-function originAllowed(origin: string): boolean {
+export function originAllowed(origin: string): boolean {
   if (ALLOWED_ORIGINS.has(origin)) return true;
   try {
     const { hostname, protocol } = new URL(origin);
@@ -51,7 +51,7 @@ const RATE_LIMIT = 20;             // requests
 const RATE_WINDOW_MS = 60 * 1000;  // per 60s per IP
 const hits = new Map<string, { count: number; resetAt: number }>();
 
-function rateLimited(ip: string): boolean {
+export function rateLimited(ip: string): boolean {
   const now = Date.now();
 
   // Drop expired buckets so a flood of distinct keys can't grow the Map without
@@ -75,7 +75,7 @@ function rateLimited(ip: string): boolean {
 // rate-limit bucket per request. Vercel's own headers are set at the edge and
 // cannot be overridden by the client, so prefer them and treat XFF as a
 // last resort.
-function clientKey(req: VercelRequest): string {
+export function clientKey(req: VercelRequest): string {
   const vercelIp = req.headers['x-vercel-forwarded-for'];
   const realIp = req.headers['x-real-ip'];
   const pick = (v: string | string[] | undefined) =>
@@ -92,7 +92,7 @@ function clientKey(req: VercelRequest): string {
 // image blocks with a URL source, which would let a caller make Anthropic fetch
 // arbitrary URLs on this key (and bill at image rates), so restrict content to
 // plain text.
-function messagesAreTextOnly(messages: unknown[]): boolean {
+export function messagesAreTextOnly(messages: unknown[]): boolean {
   return messages.every((m) => {
     if (typeof m !== 'object' || m === null) return false;
     const { role, content } = m as { role?: unknown; content?: unknown };
