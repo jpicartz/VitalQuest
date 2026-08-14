@@ -15,12 +15,35 @@ export default defineConfig({
     }
   },
   test: {
-    // Pure-logic suite: every target runs in node, so no jsdom is needed.
-    environment: 'node',
-    include: ['**/*.test.ts'],
-    exclude: ['node_modules/**', 'dist/**'],
-    // dateUtils is deliberately local-time (it avoids toISOString() UTC shifts),
-    // so the timezone must be pinned or the date tests are non-deterministic.
-    env: { TZ: 'UTC' },
+    // Two projects rather than one environment: the pure-logic suite is the bulk
+    // of the tests and runs far faster in node, while component tests need a DOM.
+    // Splitting by file extension means a new .test.tsx gets jsdom automatically —
+    // no per-file `@vitest-environment` docblock to forget.
+    // (`environmentMatchGlobs` did this in Vitest 3; it was removed in v4.)
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['**/*.test.ts'],
+          exclude: ['node_modules/**', 'dist/**'],
+          // dateUtils is deliberately local-time (it avoids toISOString() UTC
+          // shifts), so TZ must be pinned or the date tests are non-deterministic.
+          env: { TZ: 'UTC' },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: ['**/*.test.tsx'],
+          exclude: ['node_modules/**', 'dist/**'],
+          setupFiles: ['./test/setup.ts'],
+          env: { TZ: 'UTC' },
+        },
+      },
+    ],
   },
 });

@@ -28,12 +28,16 @@
     "recharts": "^3.7.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.4",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vercel/node": "^5.8.22",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.5.4",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.24",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.8.2",
