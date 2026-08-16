@@ -148,6 +148,48 @@ describe('NutritionTracker — Analysis surfaces', () => {
   });
 });
 
+describe('NutritionTracker — never renders NaN', () => {
+  // The AI returns "28g" instead of 28 often enough that this is a real input.
+  // The component used to run its own micro aggregation with `Number(x || 0)`,
+  // so the breakdown tiles rendered "NaN% DV" directly beneath a correct score.
+  // Asserting on the util alone does not catch that — it has to be the render.
+  // NB: these must be UNPARSEABLE. '420' coerces to 420 and proves nothing —
+  // it has to be a value like '420 kcal' that Number() genuinely rejects.
+  const stringyMicros = {
+    logs: [aMealLog({
+      food: aFood({
+        calories: '420 kcal' as never,
+        protein: '28 g' as never,
+        micros: { Fiber: '28g', 'Vitamin C': '90mg', Iron: 8 } as never,
+      }),
+    })],
+  };
+
+  it('shows no NaN in the Analysis tab given string-valued nutrients', async () => {
+    const { user, container } = renderTracker(stringyMicros);
+    await user.click(subTab('Analysis'));
+    expect(container.textContent).not.toMatch(/NaN/);
+  });
+
+  it('shows no NaN in the Trends snapshot given string-valued nutrients', async () => {
+    const { user, container } = renderTracker(stringyMicros);
+    await user.click(subTab('Trends'));
+    expect(container.textContent).not.toMatch(/NaN/);
+  });
+
+  it('shows no NaN in the Food Log given string-valued macros', () => {
+    const { container } = renderTracker(stringyMicros);
+    expect(container.textContent).not.toMatch(/NaN/);
+  });
+
+  it('still counts the parseable nutrient alongside the unparseable one', async () => {
+    const { user } = renderTracker(stringyMicros);
+    await user.click(subTab('Analysis'));
+    // Iron: 8 is valid and must survive; Fiber's "28g" must not poison it.
+    expect(screen.getByRole('button', { name: /Iron/ })).toBeInTheDocument();
+  });
+});
+
 describe('NutritionTracker — Trends surfaces', () => {
   it('offers the 7/14/30-day range selector', async () => {
     const { user } = renderTracker();

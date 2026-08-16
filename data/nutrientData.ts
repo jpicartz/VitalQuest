@@ -32,7 +32,8 @@ export const NUTRIENT_INFO: Record<string, NutrientEducation> = {
     sources: ["Fruit (Natural)", "Candy (Added)", "Soda (Added)"],
     caution: "High intake linked to inflammation and metabolic issues.",
     targetVal: 50,
-    unit: "g"
+    unit: "g",
+    direction: 'ceiling',
   },
 
   // --- Vitamins ---
@@ -180,7 +181,8 @@ export const NUTRIENT_INFO: Record<string, NutrientEducation> = {
     caution: "Limit intake to maintain heart health.",
     dailyValue: "<2300mg",
     targetVal: 2300,
-    unit: "mg"
+    unit: "mg",
+    direction: 'ceiling',
   },
   "Zinc": {
     description: "Supports immune function and DNA synthesis.",

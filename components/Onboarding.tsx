@@ -14,7 +14,7 @@ const steps = [
   'Medical'
 ];
 
-const inputClass = "w-full p-4 rounded-control bg-card border-2 border-edge text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none text-lg";
+const inputClass = "w-full p-4 rounded-control bg-card border-2 border-edge text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-lg";
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading }) => {
   const [step, setStep] = useState(0);

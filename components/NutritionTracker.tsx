@@ -3,7 +3,7 @@ import { Button } from './ui/Button';
 import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog, WeightEntry } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
-import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, PRIORITY_MICROS } from '../utils/nutritionAggregates';
+import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, computeConsumedMicros, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
@@ -95,23 +95,18 @@ const isViewingToday = selectedDate === toISODateString();
   // Export state
   const reportRef = useRef<HTMLDivElement>(null);
   
-  // -- Derived Data with robust Number casting to prevent string concatenation --
+  // `Number(x) || 0`, NOT `Number(x || 0)` — a string value like "420 kcal"
+  // yields NaN under the latter and poisons every total it reaches.
   const consumedMacros = logs.reduce((acc, log) => ({
-    calories: acc.calories + Number(log.food.calories || 0),
-    protein: acc.protein + Number(log.food.protein || 0),
-    carbs: acc.carbs + Number(log.food.carbs || 0),
-    fat: acc.fat + Number(log.food.fat || 0),
+    calories: acc.calories + (Number(log.food.calories) || 0),
+    protein: acc.protein + (Number(log.food.protein) || 0),
+    carbs: acc.carbs + (Number(log.food.carbs) || 0),
+    fat: acc.fat + (Number(log.food.fat) || 0),
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-  // Consolidate micros using Number() for accuracy
-  const consumedMicros: Record<string, number> = {};
-  logs.forEach(log => {
-    if (log.food.micros) {
-      Object.entries(log.food.micros).forEach(([name, amount]) => {
-        consumedMicros[name] = (consumedMicros[name] || 0) + Number(amount || 0);
-      });
-    }
-  });
+  // `logs` is already the selected day's logs, so no date filter is needed here.
+  // Shared with computeMicroScore so the tiles and the score can never disagree.
+  const consumedMicros = useMemo(() => computeConsumedMicros(logs), [logs]);
 
   const microScore = computeMicroScore(logs, selectedDate);
 
@@ -173,8 +168,9 @@ const isViewingToday = selectedDate === toISODateString();
   };
 
   const ProgressBar = ({ current, target, colorClass, label, unit }: any) => {
-    const val = Number(current || 0);
-    const tgt = Number(target || 1);
+    // Same coercion rule as everywhere else: Number(x) || fallback.
+    const val = Number(current) || 0;
+    const tgt = Number(target) || 1;
     const pct = Math.min((val / tgt) * 100, 100);
     return (
       <div className="mb-4 break-inside-avoid">
@@ -475,7 +471,7 @@ const isViewingToday = selectedDate === toISODateString();
                     <div key={type} className="bg-card rounded-card border border-edge shadow-sm dark:shadow-none overflow-hidden">
                       <div className="bg-raised p-4 flex justify-between items-center border-b border-edge">
                         <h4 className="font-bold text-fg">{type}</h4>
-                        <span className="nums text-sm text-fg-soft">{mealLogs.reduce((acc, l) => acc + Number(l.food.calories || 0), 0)} kcal</span>
+                        <span className="nums text-sm text-fg-soft">{mealLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0)} kcal</span>
                       </div>
                       <div className="divide-y divide-edge">
                         {mealLogs.length === 0 ? (
@@ -533,7 +529,7 @@ const isViewingToday = selectedDate === toISODateString();
                      placeholder="e.g. 2 eggs and a banana"
                      aria-invalid={!!aiError}
                      aria-describedby={aiError ? 'ai-food-error' : undefined}
-                     className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none"
+                     className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                    />
                    <Button onClick={handleAiParse} disabled={isAiLoading || !aiInput}>{isAiLoading ? 'Adding…' : 'Add'}</Button>
                  </div>
@@ -892,7 +888,7 @@ const isViewingToday = selectedDate === toISODateString();
                     <input
                         type="number"
                         autoFocus
-                        className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-spark focus:outline-none text-lg font-bold text-fg placeholder:text-fg-mute"
+                        className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-spark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-lg font-bold text-fg placeholder:text-fg-mute"
                         placeholder="e.g. 15"
                         value={sunlightMins}
                         onChange={e => setSunlightMins(e.target.value)}
@@ -915,7 +911,7 @@ const isViewingToday = selectedDate === toISODateString();
               <input
                 type="number"
                 autoFocus
-                className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-hydro focus:outline-none text-lg font-bold text-fg placeholder:text-fg-mute"
+                className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-hydro focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-lg font-bold text-fg placeholder:text-fg-mute"
                 placeholder="e.g. 350"
                 value={waterInput}
                 onChange={e => setWaterInput(e.target.value)}
@@ -936,7 +932,7 @@ const isViewingToday = selectedDate === toISODateString();
             <div className="mb-6">
               <label className="block text-sm font-bold text-fg mb-2">Describe what you need</label>
               <textarea
-                className="w-full p-4 bg-card border-2 border-edge rounded-control focus:border-nutri focus:outline-none text-fg placeholder:text-fg-mute mb-3"
+                className="w-full p-4 bg-card border-2 border-edge rounded-control focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-fg placeholder:text-fg-mute mb-3"
                 placeholder="e.g., 'A high protein vegan breakfast under 400 calories'"
                 rows={2}
                 value={mealCriteria}

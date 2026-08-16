@@ -325,7 +325,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 value={weightInput}
                 onChange={e => setWeightInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogWeightSubmit()}
-                className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none font-medium"
+                className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
               />
               <Button onClick={handleLogWeightSubmit} disabled={!weightInput}>Log</Button>
             </div>
@@ -454,7 +454,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <select
                   value={exType}
                   onChange={e => setExType(e.target.value)}
-                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg focus:border-nutri focus:outline-none font-medium"
+                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
                 >
                   {['Running','Walking','Cycling','Swimming','Strength Training','Yoga','HIIT','Other'].map(t => (
                     <option key={t} value={t}>{t}</option>
@@ -467,7 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   type="number" min="1" placeholder="e.g. 30"
                   value={exDuration}
                   onChange={e => setExDuration(e.target.value)}
-                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none font-medium"
+                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
                 />
               </div>
               <div>
@@ -476,7 +476,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   type="text" placeholder="e.g. Morning run, felt great"
                   value={exNotes}
                   onChange={e => setExNotes(e.target.value)}
-                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none font-medium"
+                  className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
                 />
               </div>
               {exDuration && Number(exDuration) > 0 && (
