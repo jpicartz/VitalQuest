@@ -9,6 +9,7 @@ import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
 import { RecipeModal } from './RecipeModal';
 import { Modal } from './ui/Modal';
+import { BodySystems } from './BodySystems';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
@@ -767,6 +768,10 @@ const isViewingToday = selectedDate === toISODateString();
              <ProgressBar label="Fats" current={consumedMacros.fat} target={targets.fat} unit="g" colorClass="bg-fat" />
              <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
            </section>
+
+           {/* Body-system support: the legible layer over the raw per-nutrient
+               percentages below. Deterministic, no AI call. */}
+           <BodySystems consumedMicros={consumedMicros} targets={targets} />
 
            <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
               <h3 className="text-lg font-bold text-fg mb-6">Micronutrient Breakdown</h3>
