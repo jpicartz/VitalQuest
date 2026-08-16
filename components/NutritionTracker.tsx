@@ -800,6 +800,7 @@ const isViewingToday = selectedDate === toISODateString();
                percentages below. Deterministic, no AI call. */}
            <BodySystems
              consumedMicros={consumedMicros}
+             consumedMacros={consumedMacros}
              targets={targets}
              onAskCoach={(subject, systems) => setCoach({ subject, systems })}
            />

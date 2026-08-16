@@ -8,6 +8,11 @@ import { MacroTargets } from '../types';
 
 const targets: MacroTargets = { calories: 2654, protein: 118, carbs: 355, fat: 74 };
 
+/** Macros are passed separately: protein never reaches the micros map. */
+const macros = (over: Partial<{ protein: number; carbs: number; fat: number }> = {}) =>
+  ({ protein: 0, carbs: 0, fat: 0, ...over });
+const fullMacros = macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat });
+
 /** Consumption map hitting exactly 100% of every nutrient any system uses. */
 const perfect = (): Record<string, number> => {
   const out: Record<string, number> = { Protein: targets.protein };
@@ -87,7 +92,7 @@ describe('nutrientPct', () => {
 
 describe('computeBodySystems', () => {
   it('returns all seven systems', () => {
-    const systems = computeBodySystems({}, targets);
+    const systems = computeBodySystems({}, targets, macros());
     expect(systems).toHaveLength(7);
     expect(systems.map((s) => s.id)).toEqual([
       'hair-nails', 'skin', 'muscle', 'hormonal', 'energy', 'immune', 'bone',
@@ -95,25 +100,30 @@ describe('computeBodySystems', () => {
   });
 
   it('scores every system 0 with nothing logged', () => {
-    for (const s of computeBodySystems({}, targets)) expect(s.score).toBe(0);
+    for (const s of computeBodySystems({}, targets, macros())) expect(s.score).toBe(0);
   });
 
   it('scores every system 100 when all its nutrients hit target', () => {
-    for (const s of computeBodySystems(perfect(), targets)) {
+    for (const s of computeBodySystems(perfect(), targets, fullMacros)) {
       expect(s.score, `${s.label} should be 100`).toBe(100);
     }
   });
 
   it('scores 50 at half of every target', () => {
     const half = Object.fromEntries(Object.entries(perfect()).map(([k, v]) => [k, v / 2]));
-    for (const s of computeBodySystems(half, targets)) {
+    // Macros must be halved too, or protein sits at 100% and skews the systems
+    // that include it — which is exactly the coupling this argument makes explicit.
+    const halfMacros = macros({
+      protein: targets.protein / 2, carbs: targets.carbs / 2, fat: targets.fat / 2,
+    });
+    for (const s of computeBodySystems(half, targets, halfMacros)) {
       expect(s.score, `${s.label} should be 50`).toBe(50);
     }
   });
 
   it('keeps every score within 0..100 for hostile input', () => {
     for (const consumed of [{}, { Zinc: -999 }, { Iron: 1e9 }, { Protein: NaN }]) {
-      for (const s of computeBodySystems(consumed as never, targets)) {
+      for (const s of computeBodySystems(consumed as never, targets, macros())) {
         expect(s.score).toBeGreaterThanOrEqual(0);
         expect(s.score).toBeLessThanOrEqual(100);
         expect(Number.isNaN(s.score)).toBe(false);
@@ -123,7 +133,7 @@ describe('computeBodySystems', () => {
 
   it('moves only the systems a nutrient belongs to', () => {
     // Biotin is in Hair & Nails and nowhere else.
-    const systems = computeBodySystems({ Biotin: 30 }, targets);
+    const systems = computeBodySystems({ Biotin: 30 }, targets, macros());
     const hair = systems.find((s) => s.id === 'hair-nails')!;
     const bone = systems.find((s) => s.id === 'bone')!;
     expect(hair.score).toBeGreaterThan(0);
@@ -131,14 +141,14 @@ describe('computeBodySystems', () => {
   });
 
   it('orders contributions weakest first so the UI leads with the gap', () => {
-    const systems = computeBodySystems({ Zinc: 11, Iron: 1, Protein: 118 }, targets);
+    const systems = computeBodySystems({ Zinc: 11, Iron: 1, Protein: 118 }, targets, macros());
     const hair = systems.find((s) => s.id === 'hair-nails')!;
     const pcts = hair.contributions.map((c) => c.pct);
     expect([...pcts].sort((a, b) => a - b)).toEqual(pcts);
   });
 
   it('reports gaps as the sub-50% contributors', () => {
-    const hair = computeBodySystems({ Protein: 118, Zinc: 11 }, targets)
+    const hair = computeBodySystems({ Protein: 118, Zinc: 11 }, targets, macros())
       .find((s) => s.id === 'hair-nails')!;
     const gapNames = hair.gaps.map((g) => g.nutrient);
     expect(gapNames).toContain('Biotin');   // absent → 0%
@@ -147,9 +157,72 @@ describe('computeBodySystems', () => {
   });
 
   it('carries the label and blurb for display', () => {
-    const skin = computeBodySystems({}, targets).find((s) => s.id === 'skin')!;
+    const skin = computeBodySystems({}, targets, macros()).find((s) => s.id === 'skin')!;
     expect(skin.label).toBe('Skin');
     expect(skin.blurb).toMatch(/collagen/i);
+  });
+});
+
+// ── Regression: protein came in through the wrong door ────────────────────
+// Protein lives on `food.protein` and NEVER reaches the micros map — there is
+// no MICRO_KEY_MAP alias for it. Reading it from consumedMicros silently
+// yielded 0, so Hair & Nails and Muscle were permanently dragged down by a
+// contributor that could never move. The earlier invariant test skipped macros
+// entirely, so nothing caught it.
+describe('computeBodySystems — macros come from the macros argument', () => {
+  const proteinSystems = BODY_SYSTEMS.filter((s) => s.nutrients.includes('Protein'));
+
+  it('at least two systems depend on protein', () => {
+    expect(proteinSystems.map((s) => s.id)).toEqual(['hair-nails', 'muscle']);
+  });
+
+  it('scores protein from the macros argument, not the micros map', () => {
+    const withMacro = computeBodySystems({}, targets, macros({ protein: targets.protein }));
+    for (const sys of proteinSystems) {
+      const s = withMacro.find((x) => x.id === sys.id)!;
+      const protein = s.contributions.find((c) => c.nutrient === 'Protein')!;
+      expect(protein.pct, `${s.label} protein should be 100%`).toBe(100);
+    }
+  });
+
+  it('IGNORES protein smuggled into the micros map', () => {
+    // Belt and braces: the only source of truth is the macros argument.
+    const viaMicros = computeBodySystems({ Protein: 118 }, targets, macros());
+    const hair = viaMicros.find((s) => s.id === 'hair-nails')!;
+    expect(hair.contributions.find((c) => c.nutrient === 'Protein')!.pct).toBe(0);
+  });
+
+  it('logging protein visibly raises the systems that use it', () => {
+    const none = computeBodySystems({}, targets, macros());
+    const full = computeBodySystems({}, targets, macros({ protein: targets.protein }));
+    for (const sys of proteinSystems) {
+      const before = none.find((s) => s.id === sys.id)!.score;
+      const after = full.find((s) => s.id === sys.id)!.score;
+      expect(after, `${sys.label} should rise when protein is logged`).toBeGreaterThan(before);
+    }
+  });
+
+  it('leaves protein-free systems untouched', () => {
+    const none = computeBodySystems({}, targets, macros());
+    const full = computeBodySystems({}, targets, macros({ protein: targets.protein }));
+    for (const sys of BODY_SYSTEMS.filter((s) => !s.nutrients.includes('Protein'))) {
+      expect(full.find((s) => s.id === sys.id)!.score)
+        .toBe(none.find((s) => s.id === sys.id)!.score);
+    }
+  });
+
+  it('scales protein proportionally', () => {
+    const half = computeBodySystems({}, targets, macros({ protein: targets.protein / 2 }));
+    const muscle = half.find((s) => s.id === 'muscle')!;
+    expect(muscle.contributions.find((c) => c.nutrient === 'Protein')!.pct).toBe(50);
+  });
+
+  it('survives a missing or malformed macros object', () => {
+    for (const bad of [undefined, null, { protein: NaN }, { protein: '31g' }]) {
+      const r = computeBodySystems({}, targets, bad as never);
+      expect(r).toHaveLength(7);
+      for (const s of r) expect(Number.isNaN(s.score)).toBe(false);
+    }
   });
 });
 

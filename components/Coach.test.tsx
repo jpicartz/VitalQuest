@@ -7,7 +7,7 @@ import { computeBodySystems } from '../utils/bodySystems';
 import * as claudeService from '../services/claudeService';
 
 const targets = { calories: 2200, protein: 118, carbs: 260, fat: 70 };
-const systems = computeBodySystems({ 'Vitamin C': 20, Zinc: 3 }, targets);
+const systems = computeBodySystems({ 'Vitamin C': 20, Zinc: 3 }, targets, { protein: 40, carbs: 100, fat: 30 });
 const skin = systems.find((s) => s.label === 'Skin')!;
 
 const renderCoach = (subject = skin) => ({

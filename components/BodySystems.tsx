@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MacroTargets } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import {
-  BodySystemScore, NutrientContribution, computeBodySystems, supportBand,
+  BodySystemScore, NutrientContribution, ConsumedMacros, computeBodySystems, supportBand,
 } from '../utils/bodySystems';
 import { Modal } from './ui/Modal';
 import { ScoreRing } from './ui/ScoreRing';
@@ -12,6 +12,8 @@ import { Button } from './ui/Button';
 interface BodySystemsProps {
   /** From computeConsumedMicros — the single aggregation path. */
   consumedMicros: Record<string, number>;
+  /** Protein never reaches the micros map, so macros come in separately. */
+  consumedMacros: ConsumedMacros;
   targets: MacroTargets;
   /** Opens the coach anchored to a specific finding. */
   onAskCoach?: (system: BodySystemScore, all: BodySystemScore[]) => void;
@@ -64,9 +66,9 @@ const ContributionRow: React.FC<{ c: NutrientContribution }> = ({ c }) => {
  * says these reflect *intake*, and nothing claims to describe the user's actual
  * hair, skin or hormones. The app cannot observe those.
  */
-export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, targets, onAskCoach }) => {
+export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consumedMacros, targets, onAskCoach }) => {
   const [open, setOpen] = useState<BodySystemScore | null>(null);
-  const systems = computeBodySystems(consumedMicros, targets);
+  const systems = computeBodySystems(consumedMicros, targets, consumedMacros);
 
   return (
     <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">

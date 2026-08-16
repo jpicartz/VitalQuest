@@ -136,17 +136,37 @@ export const nutrientPct = (
   };
 };
 
+/** Totals for the day's macros. Separate because they do not live in `micros`. */
+export interface ConsumedMacros {
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 /**
  * Support scores for all seven systems.
  *
- * `consumed` should come from `computeConsumedMicros` so there is exactly one
- * aggregation path in the app. `targets` supplies the per-user macro targets.
+ * `consumedMicros` comes from `computeConsumedMicros` so there is exactly one
+ * aggregation path in the app. `consumedMacros` is REQUIRED and separate,
+ * because protein is stored on `food.protein` and never reaches the micros map
+ * — `MICRO_KEY_MAP` has no alias resolving to it. Reading protein from
+ * `consumedMicros` silently yields 0, which permanently drags down every system
+ * that includes it (Hair & Nails, Muscle). Making the parameter required means
+ * a caller cannot forget it.
  */
 export const computeBodySystems = (
-  consumed: Record<string, number>,
-  targets: MacroTargets
-): BodySystemScore[] =>
-  BODY_SYSTEMS.map((system) => {
+  consumedMicros: Record<string, number>,
+  targets: MacroTargets,
+  consumedMacros: ConsumedMacros
+): BodySystemScore[] => {
+  const consumed: Record<string, number> = {
+    ...consumedMicros,
+    Protein: Number(consumedMacros?.protein) || 0,
+    Carbohydrates: Number(consumedMacros?.carbs) || 0,
+    Fats: Number(consumedMacros?.fat) || 0,
+  };
+
+  return BODY_SYSTEMS.map((system) => {
     const contributions = system.nutrients
       .map((n) => nutrientPct(n, consumed, targets))
       .filter((c): c is NutrientContribution => c !== null)
@@ -165,6 +185,7 @@ export const computeBodySystems = (
       gaps: contributions.filter((c) => c.pct < 50),
     };
   });
+};
 
 /** Plain-language band for a support score. Used for copy, never as a diagnosis. */
 export const supportBand = (score: number): 'low' | 'building' | 'solid' | 'strong' => {

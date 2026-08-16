@@ -19,9 +19,15 @@ const perfect = (): Record<string, number> => {
   return out;
 };
 
-const renderSystems = (consumed: Record<string, number> = {}) => ({
+const macros = (over: Partial<{ protein: number; carbs: number; fat: number }> = {}) =>
+  ({ protein: 0, carbs: 0, fat: 0, ...over });
+
+const renderSystems = (
+  consumed: Record<string, number> = {},
+  consumedMacros = macros()
+) => ({
   user: userEvent.setup(),
-  ...render(<BodySystems consumedMicros={consumed} targets={targets} />),
+  ...render(<BodySystems consumedMicros={consumed} consumedMacros={consumedMacros} targets={targets} />),
 });
 
 describe('BodySystems', () => {
@@ -52,7 +58,7 @@ describe('BodySystems', () => {
   });
 
   it('shows every system at full support when targets are met', () => {
-    renderSystems(perfect());
+    renderSystems(perfect(), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
     expect(screen.getAllByText('Strong')).toHaveLength(7);
   });
 
@@ -91,7 +97,7 @@ describe('BodySystems — drill-in', () => {
   });
 
   it('confirms when nothing is short rather than inventing a gap', async () => {
-    const { user } = renderSystems(perfect());
+    const { user } = renderSystems(perfect(), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
     await user.click(screen.getByRole('button', { name: /Immune support/ }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/at least halfway/i)).toBeInTheDocument();
