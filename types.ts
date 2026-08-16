@@ -104,6 +104,13 @@ export interface GamificationState {
   lastLogDate?: string;        // ISO date of last food log (for streak)
 }
 
+/** A user-set weight target. Validated by utils/goalProjection before use. */
+export interface StoredWeightGoal {
+  targetKg: number;
+  targetDate: string;  // ISO date YYYY-MM-DD
+  setOn: string;       // ISO date the goal was created
+}
+
 export interface WaterLog {
   date: string;       // ISO date YYYY-MM-DD
   mlConsumed: number;

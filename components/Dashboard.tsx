@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   CalculatedMetrics, GamificationState, UserProfile, WellnessPlan,
-  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry,
+  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry, StoredWeightGoal,
 } from '../types';
 import { PlanDisplay } from './PlanDisplay';
 import { Button } from './ui/Button';
@@ -11,6 +11,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'rec
 import { toISODateString } from '../utils/dateUtils';
 import { ScoreRing } from './ui/ScoreRing';
 import { Modal } from './ui/Modal';
+import { GoalPanel } from './GoalPanel';
 import {
   IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl, IconCheck, IconPlus, IconX,
   IconRun, IconWalk, IconBike, IconSwimming, IconBarbell, IconYoga, IconBolt, IconStretching,
@@ -38,6 +39,8 @@ interface DashboardProps {
   // Weight
   weightHistory: WeightEntry[];
   onLogWeight: (kg: number) => void;
+  weightGoal: StoredWeightGoal | null;
+  onSetWeightGoal: (goal: StoredWeightGoal | null) => void;
   // Favourites
   favouriteFoods: FoodItem[];
   onAddFavourite: (food: FoodItem) => void;
@@ -69,6 +72,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onResetWater,
   weightHistory,
   onLogWeight,
+  weightGoal,
+  onSetWeightGoal,
   favouriteFoods,
   onAddFavourite,
   onRemoveFavourite,
@@ -284,6 +289,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* ── Progress ── */}
       {activeTab === 'progress' && (
         <div className="space-y-5 animate-fade-in">
+          {/* Goal + trajectory. All safety refusals live in goalProjection. */}
+          <GoalPanel
+            profile={profile}
+            weightHistory={weightHistory}
+            goal={weightGoal}
+            onSetGoal={onSetWeightGoal}
+          />
+
           {/* Weight Log */}
           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
             <h3 className="text-lg font-bold text-fg mb-3">Body Weight</h3>

@@ -39,6 +39,8 @@ const renderDashboard = (over: Partial<Props> = {}) => {
     onResetWater: vi.fn(),
     weightHistory: [aWeightEntry({ kg: 76, isBaseline: true })],
     onLogWeight: vi.fn(),
+    weightGoal: null,
+    onSetWeightGoal: vi.fn(),
     favouriteFoods: [],
     onAddFavourite: vi.fn(),
     onRemoveFavourite: vi.fn(),

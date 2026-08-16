@@ -3,7 +3,7 @@ import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import {
   UserProfile, CalculatedMetrics, WellnessPlan, GamificationState,
-  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry,
+  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry, StoredWeightGoal,
 } from './types';
 import { generateWellnessPlan } from './services/claudeService';
 import { toISODateString, isSameISODate, timestampForISODate } from './utils/dateUtils';
@@ -36,6 +36,7 @@ const App: React.FC = () => {
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
   const [favouriteFoods, setFavouriteFoods] = useState<FoodItem[]>([]);
   const [lifetimeQuestsCompleted, setLifetimeQuestsCompleted] = useState<number>(0);
+  const [weightGoal, setWeightGoal] = useState<StoredWeightGoal | null>(null);
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
 
   // ── Theme (dual-mode) — isolated from vitalQuestData, own localStorage key ──
@@ -82,6 +83,7 @@ const App: React.FC = () => {
 
           setFoodLogs(parsed.foodLogs || []);
           setLifetimeQuestsCompleted(parsed.lifetimeQuestsCompleted || 0);
+          setWeightGoal(parsed.weightGoal || null);
 
           // Water log — reset if new day
           const savedWater: WaterLog = parsed.waterLog || { date: today, mlConsumed: 0 };
@@ -104,9 +106,10 @@ const App: React.FC = () => {
       localStorage.setItem('vitalQuestData', JSON.stringify({
         profile, metrics, plan, gamification, foodLogs,
         waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs,
+        weightGoal,
       }));
     }
-  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs]);
+  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, weightGoal]);
 
   // ── Badge checker — runs whenever gamification changes ────────────────────
   const runBadgeCheck = useCallback((
@@ -344,6 +347,8 @@ const App: React.FC = () => {
               // Weight
               weightHistory={weightHistory}
               onLogWeight={handleLogWeight}
+              weightGoal={weightGoal}
+              onSetWeightGoal={setWeightGoal}
               // Favourites
               favouriteFoods={favouriteFoods}
               onAddFavourite={handleAddFavourite}
