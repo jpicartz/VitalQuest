@@ -6,12 +6,15 @@ import {
 } from '../utils/bodySystems';
 import { Modal } from './ui/Modal';
 import { ScoreRing } from './ui/ScoreRing';
-import { IconX, IconCheck, IconArrowUpRight } from '@tabler/icons-react';
+import { IconX, IconCheck, IconArrowUpRight, IconMessageCircle } from '@tabler/icons-react';
+import { Button } from './ui/Button';
 
 interface BodySystemsProps {
   /** From computeConsumedMicros — the single aggregation path. */
   consumedMicros: Record<string, number>;
   targets: MacroTargets;
+  /** Opens the coach anchored to a specific finding. */
+  onAskCoach?: (system: BodySystemScore, all: BodySystemScore[]) => void;
 }
 
 /** Colour follows the band, so a glance reads before any number does. */
@@ -61,7 +64,7 @@ const ContributionRow: React.FC<{ c: NutrientContribution }> = ({ c }) => {
  * says these reflect *intake*, and nothing claims to describe the user's actual
  * hair, skin or hormones. The app cannot observe those.
  */
-export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, targets }) => {
+export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, targets, onAskCoach }) => {
   const [open, setOpen] = useState<BodySystemScore | null>(null);
   const systems = computeBodySystems(consumedMicros, targets);
 
@@ -142,6 +145,17 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, target
               <ContributionRow key={c.nutrient} c={c} />
             ))}
           </div>
+
+          {onAskCoach && (
+            <Button
+              variant="outline"
+              className="w-full mt-6 inline-flex items-center justify-center gap-2 text-sm"
+              onClick={() => { const s = open; setOpen(null); onAskCoach(s, systems); }}
+            >
+              <IconMessageCircle size={16} />
+              Ask why {open.label} support is {supportBand(open.score) === 'low' ? 'low' : `at ${open.score}%`}
+            </Button>
+          )}
 
           <p className="text-[11px] text-fg-mute mt-6 pt-4 border-t border-edge">
             General wellness information based on your logged food. Not medical advice.

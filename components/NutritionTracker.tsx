@@ -10,6 +10,8 @@ import { NutritionInsights } from './NutritionInsights';
 import { RecipeModal } from './RecipeModal';
 import { Modal } from './ui/Modal';
 import { BodySystems } from './BodySystems';
+import { Coach } from './Coach';
+import type { BodySystemScore } from '../utils/bodySystems';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
@@ -84,6 +86,7 @@ const [recipeModal, setRecipeModal] = useState<MealSuggestion | null>(null);
 const [isAddingWater, setIsAddingWater] = useState(false);
 const [waterInput, setWaterInput] = useState('');
 const [showFavourites, setShowFavourites] = useState(false);
+const [coach, setCoach] = useState<{ subject: BodySystemScore; systems: BodySystemScore[] } | null>(null);
 const [isExporting, setIsExporting] = useState(false);
 const [exportError, setExportError] = useState<string | null>(null);
 const [favMealType, setFavMealType] = useState<MealType>('Breakfast');
@@ -771,7 +774,11 @@ const isViewingToday = selectedDate === toISODateString();
 
            {/* Body-system support: the legible layer over the raw per-nutrient
                percentages below. Deterministic, no AI call. */}
-           <BodySystems consumedMicros={consumedMicros} targets={targets} />
+           <BodySystems
+             consumedMicros={consumedMicros}
+             targets={targets}
+             onAskCoach={(subject, systems) => setCoach({ subject, systems })}
+           />
 
            <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
               <h3 className="text-lg font-bold text-fg mb-6">Micronutrient Breakdown</h3>
@@ -846,6 +853,17 @@ const isViewingToday = selectedDate === toISODateString();
           </div>
         </div>
       )}
+      {coach && (
+        <Coach
+          profile={profile}
+          systems={coach.systems}
+          subject={coach.subject}
+          planFocus={plan?.nutritionFocus}
+          dailyCalorieTarget={targets.calories}
+          onClose={() => setCoach(null)}
+        />
+      )}
+
       {selectedNutrient && NUTRIENT_INFO[selectedNutrient] && (
         <Modal onClose={() => setSelectedNutrient(null)} labelledBy="nutrient-modal-title" className="bg-card rounded-modal p-6 max-w-md w-full shadow-2xl">
             <div className="flex justify-between items-start mb-4">

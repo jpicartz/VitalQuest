@@ -1,5 +1,6 @@
 import { UserProfile, WellnessPlan, FoodItem, MealSuggestion, MacroTargets, NutritionInsight } from "../types";
 import type { InsightsPayload } from "../utils/nutritionAggregates";
+import { COACH_SYSTEM_RULES } from "../utils/coachSafety";
 
 // Full-reasoning model for plan generation and weekly insights
 const MODEL = 'claude-sonnet-4-5';
@@ -12,7 +13,19 @@ const CLAUDE_URL = import.meta.env.DEV
   ? 'https://api.anthropic.com/v1/messages'
   : '/api/claude';
 
-const callClaude = async (system: string, userMsg: string, maxTokens = 1500, model = MODEL): Promise<string> => {
+type ChatTurn = { role: 'user' | 'assistant'; content: string };
+
+/**
+ * `userMsg` may be a single string (the common case) or a full turn array for
+ * multi-turn conversation. The proxy already accepts `role: 'assistant'`, so
+ * multi-turn needs no server change.
+ */
+const callClaude = async (
+  system: string,
+  userMsg: string | ChatTurn[],
+  maxTokens = 1500,
+  model = MODEL
+): Promise<string> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'anthropic-version': '2023-06-01',
@@ -31,7 +44,7 @@ const callClaude = async (system: string, userMsg: string, maxTokens = 1500, mod
       model,
       max_tokens: maxTokens,
       system,
-      messages: [{ role: 'user', content: userMsg }],
+      messages: Array.isArray(userMsg) ? userMsg : [{ role: 'user', content: userMsg }],
     }),
   });
 
@@ -389,4 +402,72 @@ Return ONLY JSON: {"headline":"...","patterns":["..."],"insights":["..."],"recom
       encouragement: 'Small consistent logs beat perfect sporadic ones.',
     };
   }
+};
+
+// ── Coach ──────────────────────────────────────────────────────────────────
+
+export interface CoachTurn { role: 'user' | 'assistant'; content: string }
+
+export interface CoachContext {
+  profile: UserProfile;
+  /** Body-system scores, already computed. */
+  systems: { label: string; score: number; gaps: string[] }[];
+  /** What the conversation is anchored to, e.g. "Skin". */
+  subject?: string;
+  planFocus?: string;
+  dailyCalorieTarget?: number;
+}
+
+/** Keep well under MAX_SYSTEM_CHARS (4000) once the rules are prepended. */
+const MAX_CONTEXT_CHARS = 1200;
+
+/**
+ * Assemble the per-user context block. Exported so its size can be asserted in
+ * tests — dev bypasses the proxy entirely, so an oversized prompt would 413
+ * only in production.
+ */
+export const buildCoachContext = (ctx: CoachContext): string => {
+  const { profile, systems, subject, planFocus, dailyCalorieTarget } = ctx;
+  const conditions = profile.medicationsOrConditions?.trim();
+
+  const lines = [
+    `User: ${profile.age}yo ${profile.gender}, goal ${profile.goal}.`,
+    profile.dietaryRestrictions?.length
+      ? `Dietary restrictions: ${profile.dietaryRestrictions.join(', ')}.`
+      : '',
+    conditions && !/^none$/i.test(conditions)
+      ? `SAFETY CRITICAL — reported conditions/medications: ${conditions}. Screen every suggestion against these.`
+      : '',
+    dailyCalorieTarget ? `Daily calorie target: ${dailyCalorieTarget} kcal.` : '',
+    planFocus ? `Plan focus: ${planFocus}` : '',
+    systems.length
+      ? `Today's nutrient support scores: ${systems
+          .map((s) => `${s.label} ${s.score}%${s.gaps.length ? ` (short on ${s.gaps.slice(0, 3).join(', ')})` : ''}`)
+          .join('; ')}.`
+      : 'No food logged today.',
+    subject ? `The user opened this conversation from their ${subject} score, so answer about that unless they ask otherwise.` : '',
+  ].filter(Boolean);
+
+  const out = lines.join('\n');
+  return out.length > MAX_CONTEXT_CHARS ? `${out.slice(0, MAX_CONTEXT_CHARS)}…` : out;
+};
+
+/**
+ * Ask the coach.
+ *
+ * NOTE: unlike suggestMeals and generateNutritionInsights, this deliberately
+ * does NOT fall back to canned content on failure. Those return generic text
+ * when the API is unreachable, which is fine for a meal idea and unacceptable
+ * for a conversational health surface — canned content must never appear to
+ * answer a restriction-seeking question. On error this throws and the UI says
+ * the coach is unavailable.
+ */
+export const askCoach = async (
+  history: CoachTurn[],
+  ctx: CoachContext
+): Promise<string> => {
+  const system = `${COACH_SYSTEM_RULES}\n\n--- The user's data ---\n${buildCoachContext(ctx)}`;
+  // Keep the last few turns only: enough for follow-ups, bounded for cost.
+  const turns = history.slice(-8);
+  return callClaude(system, turns, 700, MODEL_FAST);
 };
