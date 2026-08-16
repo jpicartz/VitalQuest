@@ -12,11 +12,13 @@ import { Modal } from './ui/Modal';
 import { BodySystems } from './BodySystems';
 import { Coach } from './Coach';
 import type { BodySystemScore } from '../utils/bodySystems';
+import { useSpeechInput } from '../utils/useSpeechInput';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
   IconSparkles, IconCalendar, IconStar, IconStarFilled, IconChevronDown, IconChevronUp,
   IconPlus, IconTrash, IconScale, IconFileText, IconBowl, IconFlame, IconCheck,
+  IconMicrophone, IconPlayerStopFilled,
 } from '@tabler/icons-react';
 
 interface NutritionTrackerProps {
@@ -74,6 +76,9 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // Dictation writes into the same aiInput the typed path uses, so the AI
+  // parser is shared and speech is purely additive.
+  const speech = useSpeechInput((text) => setAiInput((prev) => (prev ? `${prev} ${text}` : text)));
   const [selectedNutrient, setSelectedNutrient] = useState<string | null>(null);
   const [mealCriteria, setMealCriteria] = useState('');
 const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
@@ -535,10 +540,29 @@ const isViewingToday = selectedDate === toISODateString();
                      aria-describedby={aiError ? 'ai-food-error' : undefined}
                      className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                    />
+                   {speech.supported && (
+                     <button
+                       type="button"
+                       onClick={speech.listening ? speech.stop : speech.start}
+                       aria-label={speech.listening ? 'Stop dictating' : 'Dictate your food'}
+                       aria-pressed={speech.listening}
+                       disabled={isAiLoading}
+                       className={`shrink-0 w-12 rounded-control border-2 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50 ${
+                         speech.listening
+                           ? 'border-fat bg-fat/10 text-fat animate-pulse'
+                           : 'border-edge text-fg-soft hover:border-nutri hover:text-nutri'
+                       }`}
+                     >
+                       {speech.listening ? <IconPlayerStopFilled size={18} /> : <IconMicrophone size={18} />}
+                     </button>
+                   )}
                    <Button onClick={handleAiParse} disabled={isAiLoading || !aiInput}>{isAiLoading ? 'Adding…' : 'Add'}</Button>
                  </div>
-                 {aiError && (
-                   <p id="ai-food-error" role="alert" className="mt-2 text-sm text-fat">{aiError}</p>
+                 {speech.listening && (
+                   <p className="mt-2 text-sm text-fg-soft" aria-live="polite">Listening… say what you ate.</p>
+                 )}
+                 {(aiError || speech.error) && (
+                   <p id="ai-food-error" role="alert" className="mt-2 text-sm text-fat">{aiError ?? speech.error}</p>
                  )}
               </div>
             </div>
