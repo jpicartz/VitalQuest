@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Card } from '../ui/Card';
 import { ExerciseEntry } from '../../types';
 import { toISODateString } from '../../utils/dateUtils';
 import { Modal } from '../ui/Modal';
@@ -38,7 +39,7 @@ export const ExercisePanel: React.FC<ExercisePanelProps> = ({
             'Strength Training': IconBarbell, Yoga: IconYoga, HIIT: IconBolt, Other: IconStretching,
           };
           return (
-            <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+            <Card>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-fg">Exercise</h3>
@@ -71,12 +72,12 @@ export const ExercisePanel: React.FC<ExercisePanelProps> = ({
                   })}
                 </div>
               )}
-            </section>
+            </Card>
           );
         })()}
 
     {isLoggingExercise && (
-      <Modal onClose={() => setIsLoggingExercise(false)} labelledBy="exercise-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+      <Modal onClose={() => setIsLoggingExercise(false)} labelledBy="exercise-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
           <h3 id="exercise-modal-title" className="text-xl font-bold text-fg">Log Exercise</h3>
           <div className="space-y-3">
             <div>

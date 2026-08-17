@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Card } from './ui/Card';
 import { UserProfile, WeightEntry, StoredWeightGoal } from '../types';
 import { projectGoal } from '../utils/goalProjection';
 import { toISODateString, addDaysISO, parseISODate } from '../utils/dateUtils';
@@ -58,7 +59,7 @@ export const GoalPanel: React.FC<GoalPanelProps> = ({ profile, weightHistory, go
   };
 
   return (
-    <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+    <Card>
       <div className="flex items-center justify-between gap-3 mb-1">
         <h3 className="inline-flex items-center gap-2 text-lg font-bold text-fg">
           <IconTargetArrow size={20} className="text-nutri" /> Your Goal
@@ -243,6 +244,6 @@ export const GoalPanel: React.FC<GoalPanelProps> = ({ profile, weightHistory, go
           </div>
         </div>
       )}
-    </section>
+    </Card>
   );
 };

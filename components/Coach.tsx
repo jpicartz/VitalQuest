@@ -125,7 +125,7 @@ export const Coach: React.FC<CoachProps> = ({
     <Modal
       onClose={onClose}
       labelledBy="coach-title"
-      className="bg-card rounded-modal w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]"
+      className="bg-card rounded-modal w-full max-w-lg shadow-e3 flex flex-col max-h-[85vh]"
     >
       <div className="flex justify-between items-start gap-3 p-6 pb-4 border-b border-edge">
         <div>

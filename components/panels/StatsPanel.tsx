@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from '../ui/Card';
 import { GamificationState } from '../../types';
 
 interface StatsPanelProps {
@@ -7,8 +8,7 @@ interface StatsPanelProps {
 
 /** Extracted verbatim from Dashboard for the v2 restructure. Behaviour unchanged. */
 export const StatsPanel: React.FC<StatsPanelProps> = ({ gamification }) => (
-        <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-          <h3 className="text-lg font-bold text-fg mb-4">Stats</h3>
+        <Card title="Stats">
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'Total XP', value: gamification.xp, suffix: 'xp' },
@@ -22,5 +22,5 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ gamification }) => (
               </div>
             ))}
           </div>
-        </section>
+        </Card>
 );

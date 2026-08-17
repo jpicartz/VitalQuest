@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Card } from '../ui/Card';
 import { UserProfile, MacroTargets } from '../../types';
 import { BodySystemScore, ConsumedMacros, computeBodySystems, supportBand } from '../../utils/bodySystems';
 import { Coach } from '../Coach';
@@ -33,10 +34,7 @@ export const CoachTabPanel: React.FC<CoachTabPanelProps> = ({
 
   return (
     <div className="space-y-5">
-      <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-        <h3 className="inline-flex items-center gap-2 text-lg font-bold text-fg">
-          <IconSparkles size={20} className="text-nutri" /> Coach
-        </h3>
+      <Card title={<span className="inline-flex items-center gap-2"><IconSparkles size={20} className="text-nutri" /> Coach</span>}>
         <p className="text-sm text-fg-soft mt-1 mb-5">
           {hasData
             ? 'Ask about what you logged today.'
@@ -76,7 +74,7 @@ export const CoachTabPanel: React.FC<CoachTabPanelProps> = ({
         >
           Ask something else
         </Button>
-      </section>
+      </Card>
 
       {(open || general) && (
         <Coach

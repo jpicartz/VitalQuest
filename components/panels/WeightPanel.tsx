@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Card } from '../ui/Card';
 import { UserProfile, WeightEntry } from '../../types';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { Button } from '../ui/Button';
@@ -36,8 +37,7 @@ export const WeightPanel: React.FC<WeightPanelProps> = ({ profile, weightHistory
   };
 
   return (
-        <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-          <h3 className="text-lg font-bold text-fg mb-3">Body Weight</h3>
+        <Card title="Body Weight">
           <div className="flex gap-6 mb-4">
             <div>
               <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Starting</p>
@@ -80,6 +80,6 @@ export const WeightPanel: React.FC<WeightPanelProps> = ({ profile, weightHistory
             />
             <Button onClick={handleLogWeightSubmit} disabled={!weightInput}>Log</Button>
           </div>
-        </section>
+        </Card>
   );
 };

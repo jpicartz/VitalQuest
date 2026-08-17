@@ -106,7 +106,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
   };
 
   const unitBtn = (active: boolean) =>
-    `px-3 py-1 text-xs font-bold rounded-md transition-all ${active ? 'bg-card shadow-sm dark:shadow-none text-fg' : 'text-fg-mute'}`;
+    `px-3 py-1 text-xs font-bold rounded-md transition-all ${active ? 'bg-card shadow-e1 text-fg' : 'text-fg-mute'}`;
 
   const renderStep = () => {
     switch (step) {

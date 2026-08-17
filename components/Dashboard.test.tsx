@@ -107,8 +107,8 @@ describe('Dashboard — v2 navigation', () => {
     // Its function is absorbed by the top-level tabs. Seven navigation
     // targets became four; this asserts the old row is gone, not just moved.
     renderDashboard();
-    expect(screen.queryByRole('button', { name: 'Trends' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Analysis' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Trends' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Analysis' })).not.toBeInTheDocument();
   });
 
   it('shows only one destination at a time', async () => {
@@ -239,7 +239,7 @@ describe('Goal', () => {
   it('absorbs the trend charts that were in Trends', async () => {
     const { user } = renderDashboard();
     await user.click(tab(/Goal/));
-    expect(screen.getByRole('button', { name: '7D' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Last 7 days' })).toBeInTheDocument();
   });
 });
 

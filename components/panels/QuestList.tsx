@@ -37,7 +37,7 @@ export const QuestList: React.FC<QuestListProps> = ({
               className={`flex items-center gap-4 p-4 rounded-card border transition-all ${
                 isCompleted
                   ? 'bg-raised border-edge opacity-70'
-                  : 'bg-card border-edge hover:border-nutri/50 cursor-pointer shadow-sm dark:shadow-none'
+                  : 'bg-card border-edge hover:border-nutri/50 cursor-pointer shadow-e1'
               }`}
             >
               <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${isCompleted ? 'bg-nutri-strong text-white' : 'border-2 border-edge'}`}>

@@ -38,7 +38,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose
     <Modal
       onClose={onClose}
       labelledBy="recipe-modal-title"
-      className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+      className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-e3 max-h-[90vh] overflow-y-auto"
     >
         <div className="flex justify-between items-start mb-4">
           <h3 id="recipe-modal-title" className="text-2xl font-bold text-fg">{meal.name}</h3>

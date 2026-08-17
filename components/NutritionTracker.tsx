@@ -1,4 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { Card } from './ui/Card';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
 import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog, WeightEntry } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
@@ -314,20 +316,24 @@ const isViewingToday = selectedDate === toISODateString();
 
   return (
     <div className="space-y-6">
-      {/* Hidden when Dashboard drives the view: the top-level tabs replace it.
-          The Reset button still needs a home, so the row stays either way. */}
+      {/* Hidden when Dashboard drives the view: the top-level tabs replace it. */}
       {!view && (
-        <div className="flex flex-wrap justify-between items-center gap-3">
-          <div className={`flex gap-1 bg-raised p-1 rounded-control w-fit max-w-full overflow-x-auto `}>
-              <button onClick={() => setActiveTab('log')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'log' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Food Log</button>
-              <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Trends</button>
-              <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Analysis</button>
-          </div>
-        </div>
+        <SegmentedControl<'log' | 'trends' | 'analysis'>
+          role="tablist"
+          label="Nutrition view"
+          value={activeTab}
+          onChange={setActiveTab}
+          segmentClassName="px-4 py-2 rounded-[8px] text-sm font-semibold whitespace-nowrap"
+          segments={[
+            { value: 'log', label: 'Food Log' },
+            { value: 'trends', label: 'Trends' },
+            { value: 'analysis', label: 'Analysis' },
+          ]}
+        />
       )}
 
       {showResetConfirm && (
-        <Modal onClose={() => setShowResetConfirm(false)} labelledBy="reset-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <Modal onClose={() => setShowResetConfirm(false)} labelledBy="reset-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
              <div className="flex justify-between items-center">
                 <h3 id="reset-modal-title" className="text-xl font-bold text-fg">Reset Today's Log?</h3>
                 <button onClick={() => setShowResetConfirm(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
@@ -356,7 +362,7 @@ const isViewingToday = selectedDate === toISODateString();
                 const { title, subtitle } = formatNavigatorLabel(selectedDate);
                 const tomorrowISO = addDaysISO(toISODateString(), 1);
                 return (
-                  <div className="flex items-center justify-between bg-card p-2.5 rounded-card shadow-sm dark:shadow-none border border-edge mb-4">
+                  <div className="flex items-center justify-between bg-card p-2.5 rounded-card shadow-e1 border border-edge mb-4">
                     <button
                       onClick={() => onSelectDate(addDaysISO(selectedDate, -1))}
                       aria-label="Previous day"
@@ -380,7 +386,7 @@ const isViewingToday = selectedDate === toISODateString();
                     </button>
                   </div>
                 );
-              })()}<div className="bg-card p-6 rounded-card shadow-sm dark:shadow-none border border-edge mb-5 flex justify-between items-center">
+              })()}<div className="bg-card p-6 rounded-card shadow-e1 border border-edge mb-5 flex justify-between items-center">
                 <div>
                    <h3 className="font-semibold text-fg-soft text-xs uppercase tracking-wide">Calories Remaining</h3>
                    <div className="nums text-4xl font-bold text-fg">{Math.max(0, Math.round(targets.calories - consumedMacros.calories))}</div>
@@ -395,7 +401,7 @@ const isViewingToday = selectedDate === toISODateString();
               {isViewingToday ? (
                 <>
                   {/* Water progress bar */}
-                  <div className="bg-card p-4 rounded-card shadow-sm dark:shadow-none border border-edge mb-4">
+                  <div className="bg-card p-4 rounded-card shadow-e1 border border-edge mb-4">
                     <div className="flex justify-between items-center mb-2">
                       <span className="inline-flex items-center gap-1.5 font-semibold text-hydro text-sm"><IconDroplet size={16} /> Water Today</span>
                       <span className="nums text-sm font-semibold text-fg-soft">{waterLog.mlConsumed} / {waterGoalMl} ml <span className="text-fg-mute font-normal">({waterPct}%)</span></span>
@@ -484,7 +490,7 @@ const isViewingToday = selectedDate === toISODateString();
                 {MEAL_TYPES.map(type => {
                   const mealLogs = logs.filter(l => l.type === type);
                   return (
-                    <div key={type} className="bg-card rounded-card border border-edge shadow-sm dark:shadow-none overflow-hidden">
+                    <div key={type} className="bg-card rounded-card border border-edge shadow-e1 overflow-hidden">
                       <div className="bg-raised p-4 flex justify-between items-center border-b border-edge">
                         <h4 className="font-bold text-fg">{type}</h4>
                         <span className="nums text-sm text-fg-soft">{mealLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0)} kcal</span>
@@ -563,7 +569,7 @@ const isViewingToday = selectedDate === toISODateString();
                        {speech.listening ? <IconPlayerStopFilled size={18} /> : <IconMicrophone size={18} />}
                      </button>
                    )}
-                   <Button onClick={handleAiParse} disabled={isAiLoading || !aiInput}>{isAiLoading ? 'Adding…' : 'Add'}</Button>
+                   <Button onClick={handleAiParse} disabled={!aiInput} loading={isAiLoading} loadingLabel="Adding…">Add</Button>
                  </div>
                  {speech.listening && (
                    <p className="mt-2 text-sm text-fg-soft" aria-live="polite">Listening… say what you ate.</p>
@@ -600,22 +606,17 @@ const isViewingToday = selectedDate === toISODateString();
             plan={plan}
           />
           <div className="flex justify-end">
-            <div className="flex gap-1 bg-raised p-1 rounded-control">
-              {rangeOptions.map((days) => (
-                <button
-                  key={days}
-                  type="button"
-                  onClick={() => setRangeDays(days)}
-                  className={`nums px-4 py-1.5 rounded-[8px] text-sm font-semibold transition-all ${
-                    rangeDays === days
-                      ? 'bg-card shadow-sm dark:shadow-none text-nutri'
-                      : 'text-fg-soft hover:text-fg'
-                  }`}
-                >
-                  {days}D
-                </button>
-              ))}
-            </div>
+            <SegmentedControl<number>
+              label="Trend range"
+              nums
+              value={rangeDays}
+              onChange={setRangeDays}
+              segments={rangeOptions.map((days) => ({
+                value: days,
+                label: `${days}D`,
+                ariaLabel: `Last ${days} days`,
+              }))}
+            />
           </div>
           <TrendCharts
             dailySummaries={trendDailySummaries}
@@ -643,8 +644,7 @@ const isViewingToday = selectedDate === toISODateString();
            />
 
            {/* ── Daily Summary (water + weight) — included in PDF export ── */}
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-             <h3 className="text-lg font-bold text-fg mb-4">Daily Summary</h3>
+           <Card title="Daily Summary">
              <div className="grid grid-cols-2 gap-4">
                {/* Water */}
                <div className="bg-hydro/10 rounded-tile p-4">
@@ -676,7 +676,7 @@ const isViewingToday = selectedDate === toISODateString();
                  )}
                </div>
              </div>
-           </section>
+           </Card>
 
            {/* ── Macro donut chart ── */}
            {(() => {
@@ -693,8 +693,7 @@ const isViewingToday = selectedDate === toISODateString();
              ];
              const hasData = totalKcal > 0;
              return (
-               <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-                 <h3 className="text-lg font-bold text-fg mb-4">Calorie Breakdown</h3>
+               <Card title="Calorie Breakdown">
                  {hasData ? (
                    <div className="flex flex-col sm:flex-row items-center gap-6">
                      <div className="relative w-44 h-44 shrink-0">
@@ -735,7 +734,7 @@ const isViewingToday = selectedDate === toISODateString();
                      <p className="text-sm font-medium">Log food to see your macro breakdown</p>
                    </div>
                  )}
-               </section>
+               </Card>
              );
            })()}
 
@@ -769,8 +768,7 @@ const isViewingToday = selectedDate === toISODateString();
 
            {/* Priority-nutrient bars. Lived in Trends in v1; it answers
                "how am I doing today?", not "how has the week gone?" ── */}
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-             <h3 className="text-lg font-bold text-fg mb-1">Micronutrient Snapshot</h3>
+           <Card title="Micronutrient Snapshot">
              <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
              <div className="space-y-4">
                {PRIORITY_MICROS.map((key) => {
@@ -807,18 +805,16 @@ const isViewingToday = selectedDate === toISODateString();
                  );
                })}
              </div>
-           </section>
+           </Card>
 
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-             <h3 className="text-lg font-bold text-fg mb-6">Macro Targets</h3>
+           <Card title="Macro Targets">
              <ProgressBar label="Protein" current={consumedMacros.protein} target={targets.protein} unit="g" colorClass="bg-protein" />
              <ProgressBar label="Carbohydrates" current={consumedMacros.carbs} target={targets.carbs} unit="g" colorClass="bg-carbs" />
              <ProgressBar label="Fats" current={consumedMacros.fat} target={targets.fat} unit="g" colorClass="bg-fat" />
              <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
-           </section>
+           </Card>
 
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-              <h3 className="text-lg font-bold text-fg mb-6">Micronutrient Breakdown</h3>
+           <Card title="Micronutrient Breakdown">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                  {Object.keys(NUTRIENT_INFO).filter(k => !['Protein','Carbohydrates','Fats','Fiber','Sugar'].includes(k)).map(key => {
                     const amount = Number(consumedMicros[key] || 0);
@@ -833,9 +829,9 @@ const isViewingToday = selectedDate === toISODateString();
                     )
                  })}
               </div>
-           </section>
+           </Card>
 
-           <section className="rounded-card border border-edge shadow-sm dark:shadow-none overflow-hidden">
+           <section className="rounded-card border border-edge shadow-e1 overflow-hidden">
               {nutrientGaps.length > 0 ? (
                 <>
                   <div className="bg-gradient-to-r from-spark to-fat px-6 py-4">
@@ -848,7 +844,7 @@ const isViewingToday = selectedDate === toISODateString();
                     {nutrientGaps.map(({ key, displayPct, sources }) => (
                       <div
                         key={key}
-                        className="bg-card p-4 rounded-tile border border-edge shadow-sm dark:shadow-none"
+                        className="bg-card p-4 rounded-tile border border-edge shadow-e1"
                       >
                         <div className="flex justify-between items-start gap-3 mb-3">
                           <h4 className="font-bold text-fg">{key}</h4>
@@ -919,7 +915,7 @@ const isViewingToday = selectedDate === toISODateString();
       )}
 
       {selectedNutrient && NUTRIENT_INFO[selectedNutrient] && (
-        <Modal onClose={() => setSelectedNutrient(null)} labelledBy="nutrient-modal-title" className="bg-card rounded-modal p-6 max-w-md w-full shadow-2xl">
+        <Modal onClose={() => setSelectedNutrient(null)} labelledBy="nutrient-modal-title" className="bg-card rounded-modal p-6 max-w-md w-full shadow-e3">
             <div className="flex justify-between items-start mb-4">
                <h3 id="nutrient-modal-title" className="text-2xl font-bold text-fg">{selectedNutrient}</h3>
                <button onClick={() => setSelectedNutrient(null)} aria-label="Close" className="text-fg-mute hover:text-fg p-1"><IconX size={20} /></button>
@@ -952,7 +948,7 @@ const isViewingToday = selectedDate === toISODateString();
         </Modal>
       )}
       {isAddingSunlight && (
-        <Modal onClose={() => setIsAddingSunlight(false)} labelledBy="sunlight-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <Modal onClose={() => setIsAddingSunlight(false)} labelledBy="sunlight-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
                  <div className="flex justify-between items-center">
                     <h3 id="sunlight-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconSun size={20} className="text-spark" /> Log Sunlight</h3>
                     <button onClick={() => setIsAddingSunlight(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
@@ -978,7 +974,7 @@ const isViewingToday = selectedDate === toISODateString();
         </Modal>
       )}
       {isAddingWater && (
-        <Modal onClose={() => setIsAddingWater(false)} labelledBy="water-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <Modal onClose={() => setIsAddingWater(false)} labelledBy="water-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
             <div className="flex justify-between items-center">
               <h3 id="water-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconDroplet size={20} className="text-hydro" /> Log Water</h3>
               <button onClick={() => setIsAddingWater(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
@@ -1001,7 +997,7 @@ const isViewingToday = selectedDate === toISODateString();
         </Modal>
       )}
       {isMealBuilderOpen && (
-        <Modal onClose={() => setIsMealBuilderOpen(false)} labelledBy="mealbuilder-modal-title" className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <Modal onClose={() => setIsMealBuilderOpen(false)} labelledBy="mealbuilder-modal-title" className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-e3 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 id="mealbuilder-modal-title" className="inline-flex items-center gap-2 text-2xl font-bold text-fg"><IconSparkles size={22} className="text-nutri" /> Smart Meal Builder</h3>
               <button onClick={() => setIsMealBuilderOpen(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={22} /></button>

@@ -43,7 +43,10 @@ const renderTracker = (over: Partial<Props> = {}) => {
   return { props, user: userEvent.setup(), ...render(<NutritionTracker {...props} />) };
 };
 
-const subTab = (name: string) => screen.getByRole('button', { name });
+// The sub-destinations are a real tablist now, and the range picker a real
+// radiogroup -- both were plain buttons with no keyboard contract before.
+const subTab = (name: string) => screen.getByRole('tab', { name });
+const range = (name: string) => screen.getByRole('radio', { name });
 
 describe('NutritionTracker — the three sub-destinations', () => {
   it('opens on Food Log', () => {
@@ -55,7 +58,7 @@ describe('NutritionTracker — the three sub-destinations', () => {
   it('reaches Trends', async () => {
     const { user } = renderTracker();
     await user.click(subTab('Trends'));
-    expect(screen.getByRole('button', { name: '7D' })).toBeInTheDocument();
+    expect(range('Last 7 days')).toBeInTheDocument();
   });
 
   it('reaches Analysis', async () => {
@@ -194,8 +197,8 @@ describe('NutritionTracker — Trends surfaces', () => {
   it('offers the 7/14/30-day range selector', async () => {
     const { user } = renderTracker();
     await user.click(subTab('Trends'));
-    for (const days of ['7D', '14D', '30D']) {
-      expect(screen.getByRole('button', { name: days })).toBeInTheDocument();
+    for (const days of [7, 14, 30]) {
+      expect(range(`Last ${days} days`)).toBeInTheDocument();
     }
   });
 

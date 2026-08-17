@@ -16,6 +16,7 @@ import { ExercisePanel } from './panels/ExercisePanel';
 import { AchievementsPanel } from './panels/AchievementsPanel';
 import { StatsPanel } from './panels/StatsPanel';
 import { CoachTabPanel } from './panels/CoachTabPanel';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { computeConsumedMicros } from '../utils/nutritionAggregates';
 import {
   IconFlame, IconApple, IconBowl, IconHeartbeat, IconTargetArrow,
@@ -135,7 +136,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 pb-20">
       {/* Header */}
-      <header className="flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-sm dark:shadow-none p-5 mb-5 animate-fade-in">
+      <header className="flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-e1 p-5 mb-5 animate-fade-in">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <ScoreRing value={gamification.xp % 100} max={100} size={88} centerValue={gamification.level} label="Level" colorClass="text-nutri" />
           <div>
@@ -192,30 +193,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* Four destinations, one job each. See docs/v2-surface-inventory.md. */}
-      <div className="grid grid-cols-4 gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0" role="tablist">
-        {TABS.map(({ id, label, Icon }) => {
+      <SegmentedControl<TabId>
+        role="tablist"
+        label="Main navigation"
+        value={activeTab}
+        onChange={setActiveTab}
+        className="grid grid-cols-4 gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0"
+        segmentClassName="relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm whitespace-nowrap"
+        segments={TABS.map(({ id, label, Icon }) => {
           const remaining = dailyQuests.length - gamification.completedQuestIds.length;
-          return (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={activeTab === id}
-              onClick={() => setActiveTab(id)}
-              className={`relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-raised ${
-                activeTab === id ? 'bg-card text-nutri shadow-sm dark:shadow-none' : 'text-fg-soft hover:text-fg'
-              }`}
-            >
-              <Icon size={16} className="shrink-0" />
-              {label}
-              {id === 'goal' && remaining > 0 && (
-                <span className="nums absolute top-0.5 right-1 sm:static sm:ml-0.5 bg-nutri-strong text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
-              )}
-            </button>
-          );
+          return {
+            value: id,
+            label: (
+              <>
+                <Icon size={16} className="shrink-0" />
+                {label}
+                {id === 'goal' && remaining > 0 && (
+                  <span className="nums absolute top-0.5 right-1 sm:static sm:ml-0.5 bg-nutri-strong text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
+                )}
+              </>
+            ),
+          };
         })}
-      </div>
+      />
 
-      {/* ── My Plan ── */}
       {/* ── Today: log what I ate ── */}
       {activeTab === 'today' && (
         <NutritionTracker
@@ -334,7 +335,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <Modal
           onClose={() => setShowProfile(false)}
           labelledBy="profile-title"
-          className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[85vh] overflow-y-auto"
+          className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-e3 max-h-[85vh] overflow-y-auto"
         >
           <div className="flex justify-between items-start gap-3 mb-5">
             <h3 id="profile-title" className="text-2xl font-bold text-fg">Your Plan &amp; Progress</h3>
@@ -365,7 +366,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <Modal
           onClose={() => setShowStartOverConfirm(false)}
           labelledBy="startover-modal-title"
-          className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4"
+          className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4"
         >
             <h3 id="startover-modal-title" className="text-xl font-bold text-fg">Start Over?</h3>
             <p className="text-sm text-fg-soft">All your data will be permanently deleted.</p>

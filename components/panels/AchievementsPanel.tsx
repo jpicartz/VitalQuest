@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from '../ui/Card';
 import { GamificationState } from '../../types';
 import { BADGE_MAP, BADGE_DEFINITIONS } from '../../data/badgeDefinitions';
 
@@ -8,8 +9,7 @@ interface AchievementsPanelProps {
 
 /** Extracted verbatim from Dashboard. Behaviour unchanged. */
 export const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ gamification }) => (
-        <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-          <h3 className="text-lg font-bold text-fg mb-4">Achievements</h3>
+        <Card title="Achievements">
           {gamification.badges.length === 0 ? (
             <p className="text-sm text-fg-mute italic">No badges yet — complete quests, log food, and build your streak to earn them!</p>
           ) : (
@@ -47,5 +47,5 @@ export const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ gamificati
               </div>
             );
           })()}
-        </section>
+        </Card>
 );
