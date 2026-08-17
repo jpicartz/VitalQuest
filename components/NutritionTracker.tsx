@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Card } from './ui/Card';
+import { Field } from './ui/Field';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
 import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog, WeightEntry } from '../types';
@@ -956,18 +957,18 @@ const isViewingToday = selectedDate === toISODateString();
                  <p className="text-sm text-fg-soft">
                     Sun exposure helps your body produce Vitamin D.
                  </p>
-                 <div>
-                    <label className="block text-xs font-semibold text-fg-soft uppercase mb-1">Duration (Minutes)</label>
-                    <input
-                        type="number"
-                        autoFocus
-                        className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-spark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-lg font-bold text-fg placeholder:text-fg-mute"
-                        placeholder="e.g. 15"
-                        value={sunlightMins}
-                        onChange={e => setSunlightMins(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSaveSunlight()}
-                    />
-                 </div>
+                 <Field
+                    label="Duration (minutes)"
+                    accent="spark"
+                    emphasis
+                    suffix="min"
+                    type="number"
+                    autoFocus
+                    placeholder="e.g. 15"
+                    value={sunlightMins}
+                    onChange={e => setSunlightMins(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveSunlight()}
+                 />
                  <Button variant="primary" className="bg-spark hover:brightness-105 w-full" onClick={handleSaveSunlight}>
                     Add Vitamin D
                  </Button>
@@ -979,18 +980,18 @@ const isViewingToday = selectedDate === toISODateString();
               <h3 id="water-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconDroplet size={20} className="text-hydro" /> Log Water</h3>
               <button onClick={() => setIsAddingWater(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-fg-soft uppercase mb-1">Amount (ml)</label>
-              <input
-                type="number"
-                autoFocus
-                className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-hydro focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-lg font-bold text-fg placeholder:text-fg-mute"
-                placeholder="e.g. 350"
-                value={waterInput}
-                onChange={e => setWaterInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCustomWater()}
-              />
-            </div>
+            <Field
+              label="Amount"
+              accent="hydro"
+              emphasis
+              suffix="ml"
+              type="number"
+              autoFocus
+              placeholder="e.g. 350"
+              value={waterInput}
+              onChange={e => setWaterInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCustomWater()}
+            />
             <Button variant="primary" className="bg-hydro hover:brightness-105 w-full" onClick={handleCustomWater}>
               Add Water
             </Button>
@@ -1003,8 +1004,9 @@ const isViewingToday = selectedDate === toISODateString();
               <button onClick={() => setIsMealBuilderOpen(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={22} /></button>
             </div>
             <div className="mb-6">
-              <label className="block text-sm font-bold text-fg mb-2">Describe what you need</label>
+              <label htmlFor="meal-criteria" className="block text-xs font-semibold uppercase tracking-wider text-fg-soft mb-1.5">Describe what you need</label>
               <textarea
+                id="meal-criteria"
                 className="w-full p-4 bg-card border-2 border-edge rounded-control focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-fg placeholder:text-fg-mute mb-3"
                 placeholder="e.g., 'A high protein vegan breakfast under 400 calories'"
                 rows={2}

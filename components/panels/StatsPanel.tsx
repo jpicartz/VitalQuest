@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card } from '../ui/Card';
+import { StatTile } from '../ui/StatTile';
 import { GamificationState } from '../../types';
 
 interface StatsPanelProps {
@@ -10,16 +11,13 @@ interface StatsPanelProps {
 export const StatsPanel: React.FC<StatsPanelProps> = ({ gamification }) => (
         <Card title="Stats">
           <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Total XP', value: gamification.xp, suffix: 'xp' },
-              { label: 'Current Level', value: gamification.level, suffix: '' },
-              { label: 'Day Streak', value: gamification.streak, suffix: '' },
-              { label: 'Badges Earned', value: gamification.badges.length, suffix: '' },
-            ].map(stat => (
-              <div key={stat.label} className="bg-raised p-4 rounded-tile">
-                <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{stat.label}</p>
-                <p className="nums text-2xl font-bold text-fg">{stat.value} <span className="text-sm font-normal text-fg-soft">{stat.suffix}</span></p>
-              </div>
+            {([
+              { label: 'Total XP', value: gamification.xp, unit: 'xp', tone: 'nutri' },
+              { label: 'Current Level', value: gamification.level, unit: undefined, tone: 'neutral' },
+              { label: 'Day Streak', value: gamification.streak, unit: 'days', tone: 'spark' },
+              { label: 'Badges Earned', value: gamification.badges.length, unit: undefined, tone: 'neutral' },
+            ] as const).map(stat => (
+              <StatTile key={stat.label} label={stat.label} value={stat.value} unit={stat.unit} tone={stat.tone} />
             ))}
           </div>
         </Card>

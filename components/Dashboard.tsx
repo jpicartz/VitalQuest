@@ -136,7 +136,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 pb-20">
       {/* Header */}
-      <header className="flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-e1 p-5 mb-5 animate-fade-in">
+      <header className="relative flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-e1 p-5 mb-5 animate-fade-in">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <ScoreRing value={gamification.xp % 100} max={100} size={88} centerValue={gamification.level} label="Level" colorClass="text-nutri" />
           <div>
@@ -164,10 +164,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
         </div>
+        {/* Stacked mobile header left this on a centred row of its own, reading
+            as an orphan. Anchored top-right there; back in flow from sm up. */}
         <button
           onClick={() => setShowProfile(true)}
           aria-label="Open profile, plan and achievements"
-          className="shrink-0 w-10 h-10 rounded-control flex items-center justify-center text-fg-soft hover:bg-raised hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+          className="absolute top-4 right-4 sm:static shrink-0 w-10 h-10 rounded-control flex items-center justify-center text-fg-soft hover:bg-raised hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-card"
         >
           <IconUserCircle size={22} />
         </button>

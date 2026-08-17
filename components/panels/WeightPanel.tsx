@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card } from '../ui/Card';
+import { Field } from '../ui/Field';
 import { UserProfile, WeightEntry } from '../../types';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { Button } from '../ui/Button';
@@ -69,14 +70,18 @@ export const WeightPanel: React.FC<WeightPanelProps> = ({ profile, weightHistory
           )}
 
           <div className="flex gap-2 mt-2">
-            <input
+            <Field
+              label="Today's weight"
+              labelHidden
+              className="flex-1"
+              accent="spark"
+              suffix="kg"
               type="number"
               step="0.1"
               placeholder={`Today's weight (kg)`}
               value={weightInput}
               onChange={e => setWeightInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleLogWeightSubmit()}
-              className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
             />
             <Button onClick={handleLogWeightSubmit} disabled={!weightInput}>Log</Button>
           </div>

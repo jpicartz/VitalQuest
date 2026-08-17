@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card } from '../ui/Card';
+import { Field } from '../ui/Field';
 import { ExerciseEntry } from '../../types';
 import { toISODateString } from '../../utils/dateUtils';
 import { Modal } from '../ui/Modal';
@@ -81,8 +82,9 @@ export const ExercisePanel: React.FC<ExercisePanelProps> = ({
           <h3 id="exercise-modal-title" className="text-xl font-bold text-fg">Log Exercise</h3>
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Type</label>
+              <label htmlFor="exercise-type" className="block text-xs font-semibold uppercase tracking-wider text-fg-soft mb-1.5">Type</label>
               <select
+                id="exercise-type"
                 value={exType}
                 onChange={e => setExType(e.target.value)}
                 className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
@@ -92,24 +94,18 @@ export const ExercisePanel: React.FC<ExercisePanelProps> = ({
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Duration (minutes)</label>
-              <input
-                type="number" min="1" placeholder="e.g. 30"
-                value={exDuration}
-                onChange={e => setExDuration(e.target.value)}
-                className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-fg-soft uppercase tracking-wider mb-1.5 block">Notes <span className="normal-case font-normal text-fg-mute">(optional)</span></label>
-              <input
-                type="text" placeholder="e.g. Morning run, felt great"
-                value={exNotes}
-                onChange={e => setExNotes(e.target.value)}
-                className="w-full p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page font-medium"
-              />
-            </div>
+            <Field
+              label="Duration (minutes)"
+              type="number" min="1" placeholder="e.g. 30"
+              value={exDuration}
+              onChange={e => setExDuration(e.target.value)}
+            />
+            <Field
+              label="Notes (optional)"
+              type="text" placeholder="e.g. Morning run, felt great"
+              value={exNotes}
+              onChange={e => setExNotes(e.target.value)}
+            />
             {exDuration && Number(exDuration) > 0 && (
               <p className="nums text-sm text-nutri font-semibold bg-nutri/10 px-3 py-2 rounded-control">
                 +{Math.min(Math.floor(Number(exDuration) / 15) * 5, 30)} XP
