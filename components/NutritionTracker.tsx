@@ -616,45 +616,6 @@ const isViewingToday = selectedDate === toISODateString();
             rangeDays={rangeDays}
           />
 
-          <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-            <h3 className="text-lg font-bold text-fg mb-1">Micronutrient Snapshot</h3>
-            <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
-            <div className="space-y-4">
-              {PRIORITY_MICROS.map((key) => {
-                const info = NUTRIENT_INFO[key];
-                if (!info?.targetVal) return null;
-                const current = consumedMicros[key] || 0;
-                const pct = Math.round((current / info.targetVal) * 100);
-                const barPct = Math.min(pct, 100);
-                const colorClass =
-                  pct >= 80 ? 'bg-nutri' : pct >= 40 ? 'bg-spark' : 'bg-fat';
-                const displayAmount =
-                  current > 0 ? Math.round(current * 10) / 10 : 0;
-
-                return (
-                  <div key={key}>
-                    <div className="flex justify-between items-baseline gap-3 mb-1.5">
-                      <span className="text-sm font-semibold text-fg">{key}</span>
-                      <span className="nums text-xs text-fg-soft shrink-0">
-                        {displayAmount}
-                        {info.unit}
-                        <span className="mx-1 text-fg-mute">·</span>
-                        <span className={`font-bold ${pct >= 80 ? 'text-nutri' : pct >= 40 ? 'text-spark' : 'text-fat'}`}>
-                          {pct}% DV
-                        </span>
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-track rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-500 ${colorClass}`}
-                        style={{ width: `${barPct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
         </div>
       )}
 
@@ -674,6 +635,16 @@ const isViewingToday = selectedDate === toISODateString();
             )}
           </div>
           <div ref={reportRef} className="space-y-8">
+
+           {/* Body-system support leads the tab: it is the surface that makes
+               the raw percentages below legible. Inside reportRef so the
+               exported PDF leads with it too. Deterministic, no AI call. */}
+           <BodySystems
+             consumedMicros={consumedMicros}
+             consumedMacros={consumedMacros}
+             targets={targets}
+             onAskCoach={(subject, systems) => setCoach({ subject, systems })}
+           />
 
            {/* ── Daily Summary (water + weight) — included in PDF export ── */}
            <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
@@ -800,6 +771,48 @@ const isViewingToday = selectedDate === toISODateString();
              )}
            </section>
 
+           {/* Priority-nutrient bars. Lived in Trends in v1; it answers
+               "how am I doing today?", not "how has the week gone?" ── */}
+           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+             <h3 className="text-lg font-bold text-fg mb-1">Micronutrient Snapshot</h3>
+             <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
+             <div className="space-y-4">
+               {PRIORITY_MICROS.map((key) => {
+                 const info = NUTRIENT_INFO[key];
+                 if (!info?.targetVal) return null;
+                 const current = consumedMicros[key] || 0;
+                 const pct = Math.round((current / info.targetVal) * 100);
+                 const barPct = Math.min(pct, 100);
+                 const colorClass =
+                   pct >= 80 ? 'bg-nutri' : pct >= 40 ? 'bg-spark' : 'bg-fat';
+                 const displayAmount =
+                   current > 0 ? Math.round(current * 10) / 10 : 0;
+
+                 return (
+                   <div key={key}>
+                     <div className="flex justify-between items-baseline gap-3 mb-1.5">
+                       <span className="text-sm font-semibold text-fg">{key}</span>
+                       <span className="nums text-xs text-fg-soft shrink-0">
+                         {displayAmount}
+                         {info.unit}
+                         <span className="mx-1 text-fg-mute">·</span>
+                         <span className={`font-bold ${pct >= 80 ? 'text-nutri' : pct >= 40 ? 'text-spark' : 'text-fat'}`}>
+                           {pct}% DV
+                         </span>
+                       </span>
+                     </div>
+                     <div className="h-2.5 bg-track rounded-full overflow-hidden">
+                       <div
+                         className={`h-full transition-all duration-500 ${colorClass}`}
+                         style={{ width: `${barPct}%` }}
+                       />
+                     </div>
+                   </div>
+                 );
+               })}
+             </div>
+           </section>
+
            <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
              <h3 className="text-lg font-bold text-fg mb-6">Macro Targets</h3>
              <ProgressBar label="Protein" current={consumedMacros.protein} target={targets.protein} unit="g" colorClass="bg-protein" />
@@ -807,15 +820,6 @@ const isViewingToday = selectedDate === toISODateString();
              <ProgressBar label="Fats" current={consumedMacros.fat} target={targets.fat} unit="g" colorClass="bg-fat" />
              <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
            </section>
-
-           {/* Body-system support: the legible layer over the raw per-nutrient
-               percentages below. Deterministic, no AI call. */}
-           <BodySystems
-             consumedMicros={consumedMicros}
-             consumedMacros={consumedMacros}
-             targets={targets}
-             onAskCoach={(subject, systems) => setCoach({ subject, systems })}
-           />
 
            <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
               <h3 className="text-lg font-bold text-fg mb-6">Micronutrient Breakdown</h3>

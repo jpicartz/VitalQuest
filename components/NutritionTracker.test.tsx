@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NutritionTracker } from './NutritionTracker';
 import {
@@ -55,7 +55,7 @@ describe('NutritionTracker — the three sub-destinations', () => {
   it('reaches Trends', async () => {
     const { user } = renderTracker();
     await user.click(subTab('Trends'));
-    expect(screen.getByText('Micronutrient Snapshot')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '7D' })).toBeInTheDocument();
   });
 
   it('reaches Analysis', async () => {
@@ -199,11 +199,18 @@ describe('NutritionTracker — Trends surfaces', () => {
     }
   });
 
+  // The snapshot answers "how am I doing today?", not "how has the week gone?",
+  // so it sits with the rest of today's nutrient detail in Analysis, not Trends.
   it('lists every priority micronutrient in the snapshot', async () => {
     const { user } = renderTracker();
-    await user.click(subTab('Trends'));
+    await user.click(subTab('Analysis'));
+    // Scope to the snapshot: Fiber also appears as a Macro Targets bar, and
+    // every one of these appears again in the 26-tile breakdown below.
+    const snapshot = within(
+      screen.getByText('Micronutrient Snapshot').closest('section') as HTMLElement,
+    );
     for (const key of ['Fiber', 'Vitamin C', 'Iron', 'Omega-3']) {
-      expect(screen.getByText(key), `missing snapshot row: ${key}`).toBeInTheDocument();
+      expect(snapshot.getByText(key), `missing snapshot row: ${key}`).toBeInTheDocument();
     }
   });
 });

@@ -164,6 +164,25 @@ describe('Body', () => {
     }
   });
 
+  it('keeps the Micronutrient Snapshot, which moved here from Trends', async () => {
+    // Inventory row 21. This one WAS silently dropped in the first cut of the
+    // restructure: it lived in the Trends sub-tab, Trends was retired, and
+    // nothing referenced it. No error, no failing test, no visual glitch --
+    // it was only found by walking the inventory against the running app.
+    const { user } = renderDashboard(withFood);
+    await user.click(tab(/Body/));
+    expect(screen.getByText('Micronutrient Snapshot')).toBeInTheDocument();
+  });
+
+  it('leads with the systems — they are what make the rest legible', async () => {
+    const { user } = renderDashboard(withFood);
+    await user.click(tab(/Body/));
+    const order = ['Body System Support', 'Micronutrient Score', 'Micronutrient Snapshot', 'Micronutrient Breakdown']
+      .map((h) => screen.getByText(h).compareDocumentPosition(screen.getByText('Body System Support')));
+    // Every other heading must follow Body System Support in document order.
+    expect(order.slice(1).every((p) => p & Node.DOCUMENT_POSITION_PRECEDING)).toBe(true);
+  });
+
   it('keeps PDF export reachable', async () => {
     const { user } = renderDashboard(withFood);
     await user.click(tab(/Body/));

@@ -111,3 +111,32 @@ and no visual glitch — the only thing that catches one is walking this list.
 Walk rows 1–42 against the running app. Every row must be reachable or listed
 as an explicit cut. Phase 0's smoke tests break by design here — rewriting them
 to the new IA *is* the migration checklist.
+
+### Result of the walk (2026-08-16)
+
+**41 of 42 rows verified live. One was dropped, and it was a predicted one.**
+
+| | |
+|---|---|
+| Rows 1–12 (Today) | ✅ including all five modals |
+| Rows 13–23 (Body) | ⚠️ **row 21 was dropped** — see below. 22 others ✅ |
+| Rows 24–32 (Goal) | ✅ |
+| Rows 33–34 (Coach) | ✅ 33 live; **34 covered by `coachSafety.test.ts`, not exercised live** (needs a real message) |
+| Rows 35–38 (Profile sheet) | ✅ including the disclaimer and per-supplement caution |
+| Rows 39–42 (Shell) | ✅ |
+
+**Row 21 — Micronutrient Snapshot — was silently dropped.** It lived in the
+Trends sub-tab; Trends was retired; nothing referenced it afterwards. Exactly the
+failure this document exists to catch: no error, no failing test, no visual
+glitch. It is now in Body, below the Micronutrient Score, and covered by a test
+that fails if it disappears again.
+
+Worth recording honestly: **the rewritten smoke tests did not catch it.** They
+were written from the new IA rather than mechanically from these 42 rows, so
+they asserted what the new Body tab *does* show instead of what it *must*. Only
+the row-by-row walk found it. Write the next migration's tests from the
+inventory, row by row, not from the finished screen.
+
+**Also corrected during the walk:** Body System Support was rendering *fifth* on
+the Body tab despite row 13 saying "lead with it". It now leads, inside
+`reportRef`, so the exported PDF leads with it too.
