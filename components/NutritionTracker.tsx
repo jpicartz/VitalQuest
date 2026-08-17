@@ -44,6 +44,12 @@ interface NutritionTrackerProps {
   onAddFavourite: (food: FoodItem) => void;
   onRemoveFavourite: (foodId: string) => void;
   onQuickAddFavourite: (food: FoodItem, mealType: MealType) => void;
+  /**
+   * Which surface to render. Supplied by Dashboard in the v2 IA, where these
+   * three views live under different top-level tabs; the internal sub-tab bar
+   * is hidden when set. Left undefined, the component keeps its own sub-tabs.
+   */
+  view?: 'log' | 'trends' | 'analysis';
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
@@ -54,9 +60,12 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
   logs, onAddFood, onUpdateLog, onDeleteLog, targets, profile,
   onResetTodayLog, selectedDate, onSelectDate, allFoodLogs, plan,
   waterLog, onLogWater, onResetWater, weightHistory,
-  favouriteFoods, onAddFavourite, onRemoveFavourite, onQuickAddFavourite,
+  favouriteFoods, onAddFavourite, onRemoveFavourite, onQuickAddFavourite, view,
 }) => {
-  const [activeTab, setActiveTab] = useState<'log' | 'trends' | 'analysis'>('log');
+  const [ownTab, setOwnTab] = useState<'log' | 'trends' | 'analysis'>('log');
+  // When Dashboard drives the view, the internal sub-tabs are redundant.
+  const activeTab = view ?? ownTab;
+  const setActiveTab = setOwnTab;
 
   const [rangeDays, setRangeDays] = useState(7);
   const insightsSummaries = useMemo(() => getLastNDaysSummaries(allFoodLogs, 7), [allFoodLogs]);
@@ -305,13 +314,16 @@ const isViewingToday = selectedDate === toISODateString();
 
   return (
     <div className="space-y-6">
-      {/* wraps instead of squashing the sub-tabs against the reset button on phones */}
-      <div className="flex flex-wrap justify-between items-center gap-3">
-        <div className="flex gap-1 bg-raised p-1 rounded-control w-fit max-w-full overflow-x-auto">
-            <button onClick={() => setActiveTab('log')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'log' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Food Log</button>
-            <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Trends</button>
-            <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Analysis</button>
-        </div>
+      {/* Hidden when Dashboard drives the view: the top-level tabs replace it.
+          The Reset button still needs a home, so the row stays either way. */}
+      <div className={`flex flex-wrap justify-between items-center gap-3 ${view ? 'justify-end' : ''}`}>
+        {!view && (
+          <div className={`flex gap-1 bg-raised p-1 rounded-control w-fit max-w-full overflow-x-auto `}>
+              <button onClick={() => setActiveTab('log')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'log' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Food Log</button>
+              <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Trends</button>
+              <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Analysis</button>
+          </div>
+        )}
         {activeTab === 'log' && isViewingToday && (
           <Button variant="outline" onClick={() => setShowResetConfirm(true)} className="text-sm font-bold text-fat border-fat/30 hover:bg-fat/10 hover:text-fat">
             Reset Today's Log

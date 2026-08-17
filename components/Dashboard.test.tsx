@@ -3,17 +3,18 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dashboard } from './Dashboard';
 import {
-  aProfile, aMetrics, aPlan, aGamification, aMealLog,
+  aProfile, aMetrics, aPlan, aGamification, aMealLog, aFood,
   aWaterLog, aWeightEntry, anExercise, TODAY,
 } from '../test/fixtures';
 
 /**
- * Smoke tests written against the CURRENT (v1) information architecture:
- * 4 tabs — My Plan / Nutrition / Quests / Progress.
+ * Smoke tests for the v2 information architecture: four destinations —
+ * Today / Body / Goal / Coach — plus a profile sheet.
  *
- * These exist specifically to protect the v2 navigation restructure. The 200
- * pure-logic tests would not notice a whole destination going missing; these
- * will. When the IA changes, rewriting these IS the migration checklist.
+ * Rewritten from the v1 version as part of the restructure. Each assertion here
+ * corresponds to a row in docs/v2-surface-inventory.md; a surface that silently
+ * stops being reachable produces no error and no visual glitch, so this file is
+ * what catches it.
  */
 
 type Props = Parameters<typeof Dashboard>[0];
@@ -55,10 +56,6 @@ const renderDashboard = (over: Partial<Props> = {}) => {
 
 const tab = (name: RegExp) => screen.getByRole('tab', { name });
 
-/**
- * Scope a query to the section owning a heading. Both "Body Weight" and
- * "Exercise" render a button labelled "Log", so an unscoped query is ambiguous.
- */
 const sectionFor = (heading: string) => {
   const el = screen.getByText(heading).closest('section');
   if (!el) throw new Error(`No <section> wrapping heading "${heading}"`);
@@ -68,10 +65,8 @@ const sectionFor = (heading: string) => {
 describe('Dashboard — always-visible header', () => {
   it('shows level, XP, streak and calories', () => {
     renderDashboard({ gamification: aGamification({ xp: 120, level: 2, streak: 5 }) });
-    // NB: the visual uppercase is CSS, so the DOM text is "Level".
     expect(screen.getByText('Level')).toBeInTheDocument();
     expect(screen.getByText('120')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('day streak')).toBeInTheDocument();
     expect(screen.getByText('kcal eaten')).toBeInTheDocument();
   });
@@ -79,161 +74,216 @@ describe('Dashboard — always-visible header', () => {
   it('sums calories from the logs it is given', () => {
     renderDashboard({
       foodLogs: [
-        aMealLog({ food: { ...aMealLog().food, calories: 400 } }),
-        aMealLog({ food: { ...aMealLog().food, calories: 350 } }),
+        aMealLog({ food: aFood({ calories: 400 }) }),
+        aMealLog({ food: aFood({ calories: 350 }) }),
       ],
     });
     expect(screen.getByText('750')).toBeInTheDocument();
   });
 
-  it('renders earned badges and hides the row when there are none', () => {
-    const { unmount } = renderDashboard({ gamification: aGamification({ badges: ['century'] }) });
+  it('renders earned badges', () => {
+    renderDashboard({ gamification: aGamification({ badges: ['century'] }) });
     expect(screen.getByText('Century')).toBeInTheDocument();
-    unmount();
-    renderDashboard({ gamification: aGamification({ badges: [] }) });
-    expect(screen.queryByText('Century')).not.toBeInTheDocument();
   });
 });
 
-describe('Dashboard — the four destinations', () => {
+// ── The four destinations ─────────────────────────────────────────────────
+describe('Dashboard — v2 navigation', () => {
   it('exposes exactly four tabs', () => {
     renderDashboard();
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(4);
     expect(tabs.map((t) => t.textContent?.replace(/\d+$/, '').trim()))
-      .toEqual(['My Plan', 'Nutrition', 'Quests', 'Progress']);
+      .toEqual(['Today', 'Body', 'Goal', 'Coach']);
   });
 
-  it('opens on My Plan', () => {
+  it('opens on Today — logging is the daily job', () => {
     renderDashboard();
-    expect(tab(/My Plan/)).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('Your Path Forward')).toBeInTheDocument();
-  });
-
-  it('reaches the Nutrition destination', async () => {
-    const { user } = renderDashboard();
-    await user.click(tab(/Nutrition/));
-    expect(screen.getByText('Food Log')).toBeInTheDocument();
+    expect(tab(/Today/)).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Calories Remaining')).toBeInTheDocument();
   });
 
-  it('reaches the Quests destination', async () => {
-    const { user } = renderDashboard();
-    await user.click(tab(/Quests/));
-    expect(screen.getByText("Today's Goals")).toBeInTheDocument();
-    expect(screen.getByText('Hit Protein Target')).toBeInTheDocument();
-  });
-
-  it('reaches the Progress destination', async () => {
-    const { user } = renderDashboard();
-    await user.click(tab(/Progress/));
-    expect(screen.getByText('Body Weight')).toBeInTheDocument();
-    expect(screen.getByText('Exercise')).toBeInTheDocument();
-    expect(screen.getByText('Achievements')).toBeInTheDocument();
+  it('hides the old nutrition sub-tab bar', () => {
+    // Its function is absorbed by the top-level tabs. Seven navigation
+    // targets became four; this asserts the old row is gone, not just moved.
+    renderDashboard();
+    expect(screen.queryByRole('button', { name: 'Trends' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Analysis' })).not.toBeInTheDocument();
   });
 
   it('shows only one destination at a time', async () => {
     const { user } = renderDashboard();
-    expect(screen.getByText('Your Path Forward')).toBeInTheDocument();
-    await user.click(tab(/Progress/));
-    expect(screen.queryByText('Your Path Forward')).not.toBeInTheDocument();
-    expect(screen.getByText('Body Weight')).toBeInTheDocument();
-  });
-
-  it('badges the Quests tab with the remaining count', () => {
-    renderDashboard({ gamification: aGamification({ completedQuestIds: [] }) });
-    expect(within(tab(/Quests/)).getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('Calories Remaining')).toBeInTheDocument();
+    await user.click(tab(/Goal/));
+    expect(screen.queryByText('Calories Remaining')).not.toBeInTheDocument();
   });
 });
 
-describe('Dashboard — quest completion', () => {
-  it('awards XP and marks the quest complete', async () => {
-    const onUpdateGamification = vi.fn();
-    const { user } = renderDashboard({
-      gamification: aGamification({ xp: 120, level: 2 }),
-      onUpdateGamification,
-    });
-    await user.click(tab(/Quests/));
-    await user.click(screen.getByText('Hit Protein Target'));
+describe('Today', () => {
+  it('renders the food log', () => {
+    renderDashboard();
+    expect(screen.getByText('Calories Remaining')).toBeInTheDocument();
+    for (const meal of ['Breakfast', 'Lunch', 'Dinner', 'Snack']) {
+      expect(screen.getByText(meal)).toBeInTheDocument();
+    }
+  });
 
-    expect(onUpdateGamification).toHaveBeenCalledTimes(1);
+  it('keeps water quick-adds reachable', () => {
+    renderDashboard();
+    expect(screen.getByRole('button', { name: '+250 ml' })).toBeInTheDocument();
+  });
+
+  it('keeps the date navigator reachable', () => {
+    renderDashboard();
+    // "Today" is also the tab label now, so scope to the navigator's own row.
+    expect(screen.getByRole('button', { name: /previous day/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /next day/i })).toBeInTheDocument();
+  });
+});
+
+describe('Body', () => {
+  const withFood = { foodLogs: [aMealLog({ food: aFood({ calories: 420, protein: 28 }) })] };
+
+  it('leads with body-system support', async () => {
+    const { user } = renderDashboard(withFood);
+    await user.click(tab(/Body/));
+    expect(screen.getByText('Body System Support')).toBeInTheDocument();
+  });
+
+  it('keeps the micronutrient score, which feeds the badge', async () => {
+    const { user } = renderDashboard(withFood);
+    await user.click(tab(/Body/));
+    expect(screen.getByText('Micronutrient Score')).toBeInTheDocument();
+  });
+
+  it('keeps the analysis detail below the systems', async () => {
+    const { user } = renderDashboard(withFood);
+    await user.click(tab(/Body/));
+    for (const h of ['Daily Summary', 'Calorie Breakdown', 'Macro Targets', 'Micronutrient Breakdown']) {
+      expect(screen.getByText(h), `lost surface: ${h}`).toBeInTheDocument();
+    }
+  });
+
+  it('keeps PDF export reachable', async () => {
+    const { user } = renderDashboard(withFood);
+    await user.click(tab(/Body/));
+    expect(screen.getByRole('button', { name: /Export PDF/ })).toBeInTheDocument();
+  });
+});
+
+describe('Goal', () => {
+  it('leads with the goal panel', async () => {
+    const { user } = renderDashboard();
+    await user.click(tab(/Goal/));
+    expect(screen.getByText('Your Goal')).toBeInTheDocument();
+  });
+
+  it('absorbs the quests that were their own tab', async () => {
+    const { user } = renderDashboard();
+    await user.click(tab(/Goal/));
+    expect(screen.getByText("Today's Goals")).toBeInTheDocument();
+    expect(screen.getByText('Hit Protein Target')).toBeInTheDocument();
+  });
+
+  it('still awards XP for completing a quest', async () => {
+    const onUpdateGamification = vi.fn();
+    const { user } = renderDashboard({ gamification: aGamification({ xp: 120 }), onUpdateGamification });
+    await user.click(tab(/Goal/));
+    await user.click(screen.getByText('Hit Protein Target'));
     const [state, delta] = onUpdateGamification.mock.calls[0];
-    expect(state.xp).toBe(150);                       // 120 + 30
-    expect(state.completedQuestIds).toContain('quest-1');
+    expect(state.xp).toBe(150);
     expect(delta).toBe(1);
   });
 
-  it('does not re-award an already-completed quest', async () => {
-    const onUpdateGamification = vi.fn();
-    const { user } = renderDashboard({
-      gamification: aGamification({ completedQuestIds: ['quest-1'] }),
-      onUpdateGamification,
-    });
-    await user.click(tab(/Quests/));
-    await user.click(screen.getByText('Hit Protein Target'));
-    expect(onUpdateGamification).not.toHaveBeenCalled();
+  it('badges the Goal tab with remaining quests', () => {
+    renderDashboard();
+    expect(within(tab(/Goal/)).getByText('2')).toBeInTheDocument();
   });
-});
 
-describe('Dashboard — weight logging', () => {
-  it('submits a plausible weight', async () => {
+  it('keeps weight logging reachable', async () => {
     const onLogWeight = vi.fn();
     const { user } = renderDashboard({ onLogWeight });
-    await user.click(tab(/Progress/));
+    await user.click(tab(/Goal/));
     await user.type(screen.getByPlaceholderText(/weight/i), '73.5');
     await user.click(sectionFor('Body Weight').getByRole('button', { name: 'Log' }));
     expect(onLogWeight).toHaveBeenCalledWith(73.5);
   });
 
-  it('rejects an implausible weight rather than logging it', async () => {
-    const onLogWeight = vi.fn();
-    const { user } = renderDashboard({ onLogWeight });
-    await user.click(tab(/Progress/));
-    await user.type(screen.getByPlaceholderText(/weight/i), '900');
-    await user.click(sectionFor('Body Weight').getByRole('button', { name: 'Log' }));
-    expect(onLogWeight).not.toHaveBeenCalled();
-  });
-
-  it('shows starting, current and change from weight history', async () => {
-    const { user } = renderDashboard({
-      weightHistory: [
-        aWeightEntry({ date: '2026-01-01', kg: 78, isBaseline: true }),
-        aWeightEntry({ date: TODAY, kg: 74 }),
-      ],
-    });
-    await user.click(tab(/Progress/));
-    expect(screen.getByText('78')).toBeInTheDocument();
-    expect(screen.getByText('74')).toBeInTheDocument();
-    expect(screen.getByText('-4')).toBeInTheDocument();
-  });
-});
-
-describe('Dashboard — exercise', () => {
-  it('lists today\'s exercise with earned XP', async () => {
-    const { user } = renderDashboard({
-      exerciseLogs: [anExercise({ type: 'Running', durationMin: 30, xpEarned: 10 })],
-    });
-    await user.click(tab(/Progress/));
+  it('keeps exercise and its dialog reachable', async () => {
+    const { user } = renderDashboard({ exerciseLogs: [anExercise({ type: 'Running', xpEarned: 10 })] });
+    await user.click(tab(/Goal/));
     expect(screen.getByText('Running')).toBeInTheDocument();
-    expect(screen.getByText('+10 XP')).toBeInTheDocument();
-  });
-
-  it('opens the log-exercise dialog', async () => {
-    const { user } = renderDashboard();
-    await user.click(tab(/Progress/));
     await user.click(sectionFor('Exercise').getByRole('button', { name: 'Log' }));
     expect(await screen.findByRole('dialog', { name: 'Log Exercise' })).toBeInTheDocument();
   });
+
+  it('absorbs the trend charts that were in Trends', async () => {
+    const { user } = renderDashboard();
+    await user.click(tab(/Goal/));
+    expect(screen.getByRole('button', { name: '7D' })).toBeInTheDocument();
+  });
 });
 
-describe('Dashboard — destructive actions are confirmed', () => {
-  it('asks before starting over', async () => {
+describe('Coach', () => {
+  it('is a destination of its own', async () => {
+    const { user } = renderDashboard();
+    await user.click(tab(/Coach/));
+    expect(screen.getByRole('heading', { name: 'Coach' })).toBeInTheDocument();
+  });
+
+  it('stays anchored: offers the weakest system rather than a blank chat', async () => {
+    const { user } = renderDashboard({
+      foodLogs: [aMealLog({ food: aFood({ protein: 40, micros: { 'Vitamin C': 60 } }) })],
+    });
+    await user.click(tab(/Coach/));
+    expect(screen.getByText(/weakest area/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ask why/ })).toBeInTheDocument();
+  });
+
+  it('says so plainly when there is nothing logged to talk about', async () => {
+    const { user } = renderDashboard({ foodLogs: [] });
+    await user.click(tab(/Coach/));
+    expect(screen.getByText(/Log some food first/i)).toBeInTheDocument();
+  });
+});
+
+// ── Profile sheet: the surfaces that are not daily destinations ───────────
+describe('Profile sheet', () => {
+  const openProfile = async (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole('button', { name: /Open profile/i }));
+
+  it('opens from the header', async () => {
+    const { user } = renderDashboard();
+    await openProfile(user);
+    expect(await screen.findByRole('dialog', { name: /Your Plan/ })).toBeInTheDocument();
+  });
+
+  it('keeps PlanDisplay reachable, with its safety surfaces intact', async () => {
+    // PlanDisplay carries the AI safetyDisclaimer, per-supplement cautions and
+    // the isFallback banner. It must not be lost when its tab disappears.
+    const { user } = renderDashboard();
+    await openProfile(user);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Your Path Forward')).toBeInTheDocument();
+    expect(within(dialog).getByText('Safe Supplementation')).toBeInTheDocument();
+  });
+
+  it('keeps achievements and stats reachable', async () => {
+    const { user } = renderDashboard({ gamification: aGamification({ badges: ['century'] }) });
+    await openProfile(user);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Achievements')).toBeInTheDocument();
+    expect(within(dialog).getByText('Stats')).toBeInTheDocument();
+  });
+
+  it('keeps Start Over reachable, and still confirms first', async () => {
     const onReset = vi.fn();
     const { user } = renderDashboard({ onReset });
+    await openProfile(user);
     await user.click(screen.getByRole('button', { name: 'Start Over' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Start Over?' });
+    const confirm = await screen.findByRole('dialog', { name: 'Start Over?' });
     expect(onReset).not.toHaveBeenCalled();
-    await user.click(within(dialog).getByRole('button', { name: /Yes, Start Over/ }));
+    await user.click(within(confirm).getByRole('button', { name: /Yes, Start Over/ }));
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   CalculatedMetrics, GamificationState, UserProfile, WellnessPlan,
   MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry, StoredWeightGoal,
@@ -15,8 +15,11 @@ import { WeightPanel } from './panels/WeightPanel';
 import { ExercisePanel } from './panels/ExercisePanel';
 import { AchievementsPanel } from './panels/AchievementsPanel';
 import { StatsPanel } from './panels/StatsPanel';
+import { CoachTabPanel } from './panels/CoachTabPanel';
+import { computeConsumedMicros } from '../utils/nutritionAggregates';
 import {
-  IconFlame, IconApple, IconTrophy, IconActivity, IconMap2, IconBowl,
+  IconFlame, IconApple, IconBowl, IconHeartbeat, IconTargetArrow,
+  IconMessageCircle, IconUserCircle, IconX,
 } from '@tabler/icons-react';
 
 interface DashboardProps {
@@ -54,6 +57,16 @@ interface DashboardProps {
   onDeleteExercise: (id: string) => void;
 }
 
+export type TabId = 'today' | 'body' | 'goal' | 'coach';
+
+/** Four destinations. Each answers one question; see the surface inventory. */
+const TABS: { id: TabId; label: string; Icon: typeof IconBowl }[] = [
+  { id: 'today', label: 'Today',  Icon: IconBowl },     // what did I eat
+  { id: 'body',  label: 'Body',   Icon: IconHeartbeat },// what did it do
+  { id: 'goal',  label: 'Goal',   Icon: IconTargetArrow },// where am I heading
+  { id: 'coach', label: 'Coach',  Icon: IconMessageCircle },// ask why
+];
+
 export const Dashboard: React.FC<DashboardProps> = ({
   profile,
   metrics,
@@ -84,7 +97,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onLogExercise,
   onDeleteExercise,
 }) => {
-  const [activeTab, setActiveTab] = useState<'plan' | 'quests' | 'nutrition' | 'progress'>('plan');
+  const [activeTab, setActiveTab] = useState<TabId>('today');
+  const [showProfile, setShowProfile] = useState(false);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
 
   const completeQuest = (questId: string, xpReward: number) => {
@@ -99,6 +113,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
     onUpdateGamification(newState, 1);
   };
+
+  // Today's intake, for the Coach tab. Same single aggregation path the
+  // Body tab uses, so the coach can never quote a different number.
+  const coachMicros = useMemo(() => computeConsumedMicros(foodLogs), [foodLogs]);
+  const coachMacros = useMemo(() => foodLogs.reduce((a, l) => ({
+    protein: a.protein + (Number(l.food.protein) || 0),
+    carbs:   a.carbs   + (Number(l.food.carbs)   || 0),
+    fat:     a.fat     + (Number(l.food.fat)     || 0),
+  }), { protein: 0, carbs: 0, fat: 0 }), [foodLogs]);
 
   // The plan comes from the AI, so never assume its arrays are present.
   const dailyQuests = plan.dailyQuests ?? [];
@@ -140,6 +163,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
         </div>
+        <button
+          onClick={() => setShowProfile(true)}
+          aria-label="Open profile, plan and achievements"
+          className="shrink-0 w-10 h-10 rounded-control flex items-center justify-center text-fg-soft hover:bg-raised hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+        >
+          <IconUserCircle size={22} />
+        </button>
       </header>
 
       {/* Badges row */}
@@ -161,31 +191,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Tabs */}
-      {/* 4-up grid on phones so every tab is reachable without a hidden
-          horizontal scroll; inline row from sm: upward. */}
-      <div className="grid grid-cols-4 sm:flex gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0" role="tablist">
-        {(['plan', 'nutrition', 'quests', 'progress'] as const).map((tab) => {
-          const meta = {
-            plan: { label: 'My Plan', Icon: IconMap2 },
-            nutrition: { label: 'Nutrition', Icon: IconBowl },
-            quests: { label: 'Quests', Icon: IconTrophy },
-            progress: { label: 'Progress', Icon: IconActivity },
-          }[tab];
+      {/* Four destinations, one job each. See docs/v2-surface-inventory.md. */}
+      <div className="grid grid-cols-4 gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0" role="tablist">
+        {TABS.map(({ id, label, Icon }) => {
           const remaining = dailyQuests.length - gamification.completedQuestIds.length;
           return (
             <button
-              key={tab}
+              key={id}
               role="tab"
-              aria-selected={activeTab === tab}
-              onClick={() => setActiveTab(tab)}
-              className={`relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm transition-all whitespace-nowrap ${
-                activeTab === tab ? 'bg-card text-nutri shadow-sm dark:shadow-none' : 'text-fg-soft hover:text-fg'
+              aria-selected={activeTab === id}
+              onClick={() => setActiveTab(id)}
+              className={`relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-raised ${
+                activeTab === id ? 'bg-card text-nutri shadow-sm dark:shadow-none' : 'text-fg-soft hover:text-fg'
               }`}
             >
-              <meta.Icon size={16} className="shrink-0" />
-              {meta.label}
-              {tab === 'quests' && remaining > 0 && (
+              <Icon size={16} className="shrink-0" />
+              {label}
+              {id === 'goal' && remaining > 0 && (
                 <span className="nums absolute top-0.5 right-1 sm:static sm:ml-0.5 bg-nutri-strong text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{remaining}</span>
               )}
             </button>
@@ -194,11 +216,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* ── My Plan ── */}
-      {activeTab === 'plan' && <PlanDisplay plan={plan} />}
-
-      {/* ── Nutrition & Logs ── */}
-      {activeTab === 'nutrition' && (
+      {/* ── Today: log what I ate ── */}
+      {activeTab === 'today' && (
         <NutritionTracker
+          view="log"
           logs={foodLogs}
           onAddFood={onAddFood}
           onUpdateLog={onUpdateLog}
@@ -221,15 +242,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
         />
       )}
 
-      {/* ── Daily Quests ── */}
-      {activeTab === 'quests' && (
-        <QuestList dailyQuests={dailyQuests} gamification={gamification} completeQuest={completeQuest} />
+      {/* ── Body: understand what it did ── */}
+      {activeTab === 'body' && (
+        <NutritionTracker
+          view="analysis"
+          logs={foodLogs}
+          onAddFood={onAddFood}
+          onUpdateLog={onUpdateLog}
+          onDeleteLog={onDeleteLog}
+          selectedDate={selectedDate}
+          onSelectDate={onSelectDate}
+          allFoodLogs={allFoodLogs}
+          targets={{ calories: metrics.tdee, ...metrics.macros }}
+          profile={profile}
+          plan={plan}
+          onResetTodayLog={onResetTodayLog}
+          waterLog={waterLog}
+          onLogWater={onLogWater}
+          onResetWater={onResetWater}
+          weightHistory={weightHistory}
+          favouriteFoods={favouriteFoods}
+          onAddFavourite={onAddFavourite}
+          onRemoveFavourite={onRemoveFavourite}
+          onQuickAddFavourite={onQuickAddFavourite}
+        />
       )}
 
-      {/* ── Progress ── */}
-      {activeTab === 'progress' && (
+      {/* ── Goal: where I'm heading and what to do now ── */}
+      {activeTab === 'goal' && (
         <div className="space-y-5 animate-fade-in">
-          {/* Goal + trajectory. All safety refusals live in goalProjection. */}
+          {/* All safety refusals live in goalProjection, not in a prompt. */}
           <GoalPanel
             profile={profile}
             weightHistory={weightHistory}
@@ -237,21 +279,87 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onSetGoal={onSetWeightGoal}
           />
 
+          {/* Quests are today's actions toward the goal, not free-floating
+              gamification — which is why they live here rather than in a tab. */}
+          <QuestList dailyQuests={dailyQuests} gamification={gamification} completeQuest={completeQuest} />
+
           <WeightPanel profile={profile} weightHistory={weightHistory} onLogWeight={onLogWeight} />
 
           <ExercisePanel exerciseLogs={exerciseLogs} onLogExercise={onLogExercise} onDeleteExercise={onDeleteExercise} />
 
-          <AchievementsPanel gamification={gamification} />
-
-          <StatsPanel gamification={gamification} />
+          {/* Trend charts + AI weekly insights (was the Trends sub-tab). */}
+        <NutritionTracker
+          view="trends"
+          logs={foodLogs}
+          onAddFood={onAddFood}
+          onUpdateLog={onUpdateLog}
+          onDeleteLog={onDeleteLog}
+          selectedDate={selectedDate}
+          onSelectDate={onSelectDate}
+          allFoodLogs={allFoodLogs}
+          targets={{ calories: metrics.tdee, ...metrics.macros }}
+          profile={profile}
+          plan={plan}
+          onResetTodayLog={onResetTodayLog}
+          waterLog={waterLog}
+          onLogWater={onLogWater}
+          onResetWater={onResetWater}
+          weightHistory={weightHistory}
+          favouriteFoods={favouriteFoods}
+          onAddFavourite={onAddFavourite}
+          onRemoveFavourite={onRemoveFavourite}
+          onQuickAddFavourite={onQuickAddFavourite}
+        />
         </div>
       )}
 
-      <div className="mt-12 text-center">
-        <Button variant="ghost" onClick={() => setShowStartOverConfirm(true)} className="text-fg-mute text-sm">Start Over</Button>
-      </div>
+      {/* ── Coach: ask why ── */}
+      {activeTab === 'coach' && (
+        <div className="animate-fade-in">
+          <CoachTabPanel
+            profile={profile}
+            consumedMicros={coachMicros}
+            consumedMacros={coachMacros}
+            targets={{ calories: metrics.tdee, ...metrics.macros }}
+            planFocus={plan.nutritionFocus}
+          />
+        </div>
+      )}
 
-      {/* ── Exercise log modal ── */}
+      {/* Profile sheet: everything that is not a daily destination.
+          PlanDisplay lives HERE, not inside Goal — it carries the AI
+          safetyDisclaimer, per-supplement cautions and the isFallback banner,
+          and burying the medical-safety surface in a weight tab weakens it. */}
+      {showProfile && (
+        <Modal
+          onClose={() => setShowProfile(false)}
+          labelledBy="profile-title"
+          className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[85vh] overflow-y-auto"
+        >
+          <div className="flex justify-between items-start gap-3 mb-5">
+            <h3 id="profile-title" className="text-2xl font-bold text-fg">Your Plan &amp; Progress</h3>
+            <button onClick={() => setShowProfile(false)} aria-label="Close" className="text-fg-mute hover:text-fg p-1">
+              <IconX size={20} />
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            <PlanDisplay plan={plan} />
+            <AchievementsPanel gamification={gamification} />
+            <StatsPanel gamification={gamification} />
+
+            <div className="pt-2 text-center">
+              <Button
+                variant="ghost"
+                onClick={() => { setShowProfile(false); setShowStartOverConfirm(true); }}
+                className="text-fg-mute text-sm"
+              >
+                Start Over
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {showStartOverConfirm && (
         <Modal
