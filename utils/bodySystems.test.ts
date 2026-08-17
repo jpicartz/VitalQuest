@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  BODY_SYSTEMS, computeBodySystems, nutrientPct, supportBand,
+  BODY_SYSTEMS, computeBodySystems, nutrientPct, supportBand, computeLimitingNutrients,
 } from './bodySystems';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { MICRO_KEY_MAP } from '../services/claudeService';
@@ -279,5 +279,65 @@ describe('body-system nutrient invariants', () => {
     for (const s of BODY_SYSTEMS) {
       expect(s.nutrients.length, `${s.label} is too thin`).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+describe('computeLimitingNutrients', () => {
+  /** A system score shaped just enough for the function under test. */
+  const sys = (label: string, gaps: [string, number, boolean?][]) => ({
+    id: label as never, label, blurb: '', score: 0, contributions: [],
+    gaps: gaps.map(([nutrient, pct, isCeiling]) => ({ nutrient, pct, isCeiling: !!isCeiling })),
+  });
+
+  it('reports a nutrient that limits more than one system', () => {
+    const out = computeLimitingNutrients([
+      sys('Hair & Nails', [['Vitamin D', 20]]),
+      sys('Muscle', [['Vitamin D', 20]]),
+      sys('Bone', [['Vitamin D', 20]]),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].nutrient).toBe('Vitamin D');
+    expect(out[0].systems).toEqual(['Hair & Nails', 'Muscle', 'Bone']);
+  });
+
+  it('ignores a nutrient that limits only one system', () => {
+    // This is the whole point: the headline claims a *shared* cause. A gap in a
+    // single system is already visible on that system's own row.
+    const out = computeLimitingNutrients([
+      sys('Skin', [['Vitamin C', 30]]),
+      sys('Muscle', [['Magnesium', 40]]),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it('never tells you to eat more of a ceiling nutrient', () => {
+    // Sodium and Sugar score low when you have had TOO MUCH. Surfacing them as
+    // something to add would invert the advice.
+    const out = computeLimitingNutrients([
+      sys('Hormonal', [['Sodium', 10, true]]),
+      sys('Energy', [['Sodium', 10, true]]),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it('ranks by systems affected, then severity', () => {
+    const out = computeLimitingNutrients([
+      sys('A', [['Zinc', 40], ['Iron', 10]]),
+      sys('B', [['Zinc', 40], ['Iron', 10]]),
+      sys('C', [['Zinc', 40]]),
+    ]);
+    expect(out.map((n) => n.nutrient)).toEqual(['Zinc', 'Iron']);
+  });
+
+  it('reports the worst percentage across the systems it limits', () => {
+    const out = computeLimitingNutrients([
+      sys('A', [['Iron', 45]]),
+      sys('B', [['Iron', 12]]),
+    ]);
+    expect(out[0].pct).toBe(12);
+  });
+
+  it('returns nothing for a well-covered day', () => {
+    expect(computeLimitingNutrients([sys('A', []), sys('B', [])])).toEqual([]);
   });
 });

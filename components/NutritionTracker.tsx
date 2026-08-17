@@ -316,20 +316,15 @@ const isViewingToday = selectedDate === toISODateString();
     <div className="space-y-6">
       {/* Hidden when Dashboard drives the view: the top-level tabs replace it.
           The Reset button still needs a home, so the row stays either way. */}
-      <div className={`flex flex-wrap justify-between items-center gap-3 ${view ? 'justify-end' : ''}`}>
-        {!view && (
+      {!view && (
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <div className={`flex gap-1 bg-raised p-1 rounded-control w-fit max-w-full overflow-x-auto `}>
               <button onClick={() => setActiveTab('log')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'log' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Food Log</button>
               <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Trends</button>
               <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Analysis</button>
           </div>
-        )}
-        {activeTab === 'log' && isViewingToday && (
-          <Button variant="outline" onClick={() => setShowResetConfirm(true)} className="text-sm font-bold text-fat border-fat/30 hover:bg-fat/10 hover:text-fat">
-            Reset Today's Log
-          </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showResetConfirm && (
         <Modal onClose={() => setShowResetConfirm(false)} labelledBy="reset-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
@@ -579,6 +574,20 @@ const isViewingToday = selectedDate === toISODateString();
               </div>
             </div>
           )}
+
+          {/* Destructive, so it sits after the log it clears rather than above
+              it. Nobody arrives on this screen wanting to erase the day. */}
+          {isViewingToday && (
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="danger"
+                onClick={() => setShowResetConfirm(true)}
+                className="text-sm font-bold"
+              >
+                Reset Today&apos;s Log
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -621,19 +630,6 @@ const isViewingToday = selectedDate === toISODateString();
 
       {activeTab === 'analysis' && (
         <div className="animate-fade-in space-y-8">
-          <div className="flex flex-col items-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleExportPDF}
-              disabled={isExporting}
-              className="inline-flex items-center gap-1.5 text-sm font-bold"
-            >
-              <IconFileText size={16} /> {isExporting ? 'Preparing…' : 'Export PDF'}
-            </Button>
-            {exportError && (
-              <p role="alert" className="text-sm text-fat">{exportError}</p>
-            )}
-          </div>
           <div ref={reportRef} className="space-y-8">
 
            {/* Body-system support leads the tab: it is the surface that makes
@@ -891,6 +887,23 @@ const isViewingToday = selectedDate === toISODateString();
                 </div>
               )}
            </section>
+          </div>
+
+          {/* Sits after the report it exports, not floating above the hero.
+              Outside reportRef so the button never appears in the PDF. */}
+          <div className="flex flex-col items-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              loading={isExporting}
+              loadingLabel="Preparing…"
+              className="inline-flex items-center gap-1.5 text-sm font-bold"
+            >
+              <IconFileText size={16} /> Export PDF
+            </Button>
+            {exportError && (
+              <p role="alert" className="text-sm text-fat">{exportError}</p>
+            )}
           </div>
         </div>
       )}

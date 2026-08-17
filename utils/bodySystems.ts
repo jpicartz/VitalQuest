@@ -194,3 +194,53 @@ export const supportBand = (score: number): 'low' | 'building' | 'solid' | 'stro
   if (score < 85) return 'solid';
   return 'strong';
 };
+
+export interface LimitingNutrient {
+  nutrient: string;
+  /** Labels of the systems this nutrient is currently holding back. */
+  systems: string[];
+  /** Lowest percentage this nutrient reaches across those systems. */
+  pct: number;
+}
+
+/**
+ * Nutrients that are holding back more than one system at once.
+ *
+ * The seven systems are not independent: Vitamin D feeds hair, muscle,
+ * hormones and bone; zinc feeds hair, skin and hormones; protein feeds hair and
+ * muscle. So a single gap usually drags several scores down together, and the
+ * useful thing to tell someone is not "here are seven numbers" but "one thing
+ * is behind three of them" — that turns a dashboard into an instruction.
+ *
+ * Derived entirely from scores already computed. It makes no new claim: a
+ * nutrient "limits" a system only when it is already in that system's `gaps`.
+ *
+ * Ranked by systems affected, then by severity, then alphabetically so the
+ * order is stable across renders for equal candidates.
+ */
+export const computeLimitingNutrients = (systems: BodySystemScore[]): LimitingNutrient[] => {
+  const byNutrient = new Map<string, { systems: string[]; pct: number }>();
+
+  for (const system of systems) {
+    for (const gap of system.gaps) {
+      // A ceiling nutrient scoring low means "too much", not "not enough".
+      // Telling someone to eat more sodium would invert the advice.
+      if (gap.isCeiling) continue;
+      const entry = byNutrient.get(gap.nutrient);
+      if (entry) {
+        entry.systems.push(system.label);
+        entry.pct = Math.min(entry.pct, gap.pct);
+      } else {
+        byNutrient.set(gap.nutrient, { systems: [system.label], pct: gap.pct });
+      }
+    }
+  }
+
+  return [...byNutrient.entries()]
+    .map(([nutrient, v]) => ({ nutrient, systems: v.systems, pct: v.pct }))
+    .filter((n) => n.systems.length > 1)
+    .sort((a, b) =>
+      b.systems.length - a.systems.length ||
+      a.pct - b.pct ||
+      a.nutrient.localeCompare(b.nutrient));
+};

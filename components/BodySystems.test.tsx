@@ -8,7 +8,8 @@ import { MacroTargets } from '../types';
 
 const targets: MacroTargets = { calories: 2654, protein: 118, carbs: 355, fat: 74 };
 
-const perfect = (): Record<string, number> => {
+/** Every nutrient at target. `over` starves specific ones to force a gap. */
+const perfect = (over: Record<string, number> = {}): Record<string, number> => {
   const out: Record<string, number> = { Protein: targets.protein };
   for (const s of BODY_SYSTEMS) {
     for (const n of s.nutrients) {
@@ -16,7 +17,7 @@ const perfect = (): Record<string, number> => {
       if (t) out[n] = t;
     }
   }
-  return out;
+  return { ...out, ...over };
 };
 
 const macros = (over: Partial<{ protein: number; carbs: number; fat: number }> = {}) =>
@@ -57,14 +58,46 @@ describe('BodySystems', () => {
     expect(container.textContent).not.toMatch(/NaN/);
   });
 
+  // The featured "weakest today" tile reads "<Band> support"; the six compact
+  // tiles read "<Band>". Matching the leading word covers both without
+  // pinning the copy of either.
+  const bandTiles = (band: string) =>
+    screen.getAllByText((_, el) => el?.textContent?.trim().startsWith(band) === true
+      && el.className.includes('uppercase'));
+
   it('shows every system at full support when targets are met', () => {
     renderSystems(perfect(), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
-    expect(screen.getAllByText('Strong')).toHaveLength(7);
+    expect(bandTiles('Strong')).toHaveLength(7);
   });
 
   it('shows low support with nothing logged', () => {
     renderSystems();
-    expect(screen.getAllByText('Low')).toHaveLength(7);
+    expect(bandTiles('Low')).toHaveLength(7);
+  });
+
+  it('ranks the systems worst-first so the order carries information', () => {
+    // Zinc feeds Hair & Nails, Skin and Hormonal; starving it while everything
+    // else is met must push those to the front.
+    renderSystems(perfect({ Zinc: 0 }), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
+    const scores = screen.getAllByRole('button')
+      .map((b) => Number(b.getAttribute('aria-label')?.match(/(\d+) percent/)?.[1]))
+      .filter((n) => Number.isFinite(n));
+    expect(scores).toEqual([...scores].sort((a, b) => a - b));
+  });
+
+  it('makes the headline and the weakest tile name the same nutrient', () => {
+    // These sit adjacent, and both look like the answer to "what do I fix?".
+    // Sorting the tile's gaps by severity alone made them disagree.
+    renderSystems(perfect({ Zinc: 0, Biotin: 0.1 }), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
+    const headline = screen.getByText(/is holding back/).textContent ?? '';
+    const shared = headline.match(/^(\S+)/)?.[1] ?? '';
+    const featured = screen.getByRole('button', { name: /weakest today/i }).textContent ?? '';
+    expect(featured, `headline names ${shared}, tile says: ${featured}`).toContain(shared);
+  });
+
+  it('names the nutrient limiting more than one system', () => {
+    renderSystems(perfect({ Zinc: 0 }), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
+    expect(screen.getByText(/is holding back/)).toHaveTextContent(/Zinc is holding back \d+ systems/);
   });
 
   it('exposes each system as a labelled button for keyboard users', () => {
