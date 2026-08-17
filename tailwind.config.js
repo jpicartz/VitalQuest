@@ -53,6 +53,18 @@ export default {
         card: '16px',
         modal: '20px',
       },
+      boxShadow: {
+        // Theme-aware elevation — see index.css. `shadow-e1` is correct in both
+        // themes, which `shadow-sm dark:shadow-none` never was.
+        e1: 'var(--elev-1)',
+        e2: 'var(--elev-2)',
+        e3: 'var(--elev-3)',
+      },
+      spacing: {
+        tight: 'var(--space-tight)',
+        group: 'var(--space-group)',
+        section: 'var(--space-section)',
+      },
       fontFamily: {
         // Must match the body rule in index.css. Previously this said 'Inter',
         // which is no longer loaded, so `font-sans` silently overrode the real
