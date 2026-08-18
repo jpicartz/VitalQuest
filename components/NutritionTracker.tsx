@@ -1,57 +1,61 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { FoodItem, MealType, MealSuggestion } from '../types';
+import { useProfile } from '../contexts/ProfileContext';
+import { useLogs, useLogActions } from '../contexts/LogsContext';
+import { Card } from './ui/Card';
+import { Field } from './ui/Field';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
-import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog, WeightEntry } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
-import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, PRIORITY_MICROS } from '../utils/nutritionAggregates';
+import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, computeConsumedMicros, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
 import { RecipeModal } from './RecipeModal';
 import { Modal } from './ui/Modal';
+import { BodySystems } from './BodySystems';
+import { Coach } from './Coach';
+import type { BodySystemScore } from '../utils/bodySystems';
+import { useSpeechInput } from '../utils/useSpeechInput';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
   IconSparkles, IconCalendar, IconStar, IconStarFilled, IconChevronDown, IconChevronUp,
   IconPlus, IconTrash, IconScale, IconFileText, IconBowl, IconFlame, IconCheck,
+  IconMicrophone, IconPlayerStopFilled,
 } from '@tabler/icons-react';
 
 interface NutritionTrackerProps {
-  logs: MealLog[];
-  onAddFood: (meal: MealType, food: FoodItem) => void;
-  onUpdateLog: (log: MealLog) => void;
-  onDeleteLog: (logId: string) => void;
-  targets: MacroTargets;
-  profile: UserProfile;
-  selectedDate: string;
-  onSelectDate: (date: string) => void;
-  allFoodLogs: MealLog[];
-  onResetTodayLog: () => void;
-  plan?: WellnessPlan;
-  // Water
-  waterLog: WaterLog;
-  onLogWater: (ml: number) => void;
-  onResetWater: () => void;
-  // Weight (for PDF export summary)
-  weightHistory: WeightEntry[];
-  // Favourites
-  favouriteFoods: FoodItem[];
-  onAddFavourite: (food: FoodItem) => void;
-  onRemoveFavourite: (foodId: string) => void;
-  onQuickAddFavourite: (food: FoodItem, mealType: MealType) => void;
+  /**
+   * Which surface to render. Supplied by Dashboard in the v2 IA, where these
+   * three views live under different top-level tabs; the internal sub-tab bar
+   * is hidden when set. Left undefined, the component keeps its own sub-tabs.
+   *
+   * This is now the component's ONLY prop. Everything else it needs comes from
+   * the profile and logs contexts -- it was taking 20, repeated verbatim at
+   * three call sites in Dashboard.
+   */
+  view?: 'log' | 'trends' | 'analysis';
 }
 
 const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
 const rangeOptions = [7, 14, 30];
 
-export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
-  logs, onAddFood, onUpdateLog, onDeleteLog, targets, profile,
-  onResetTodayLog, selectedDate, onSelectDate, allFoodLogs, plan,
-  waterLog, onLogWater, onResetWater, weightHistory,
-  favouriteFoods, onAddFavourite, onRemoveFavourite, onQuickAddFavourite,
-}) => {
-  const [activeTab, setActiveTab] = useState<'log' | 'trends' | 'analysis'>('log');
+export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
+  const { profile, plan, targets } = useProfile();
+  const {
+    foodLogs: logs, allFoodLogs, selectedDate, waterLog, weightHistory, favouriteFoods,
+  } = useLogs();
+  const {
+    onAddFood, onDeleteLog, onResetTodayLog, onSelectDate,
+    onLogWater, onResetWater, onAddFavourite, onRemoveFavourite, onQuickAddFavourite,
+  } = useLogActions();
+  const [ownTab, setOwnTab] = useState<'log' | 'trends' | 'analysis'>('log');
+  // When Dashboard drives the view, the internal sub-tabs are redundant.
+  const activeTab = view ?? ownTab;
+  const setActiveTab = setOwnTab;
 
   const [rangeDays, setRangeDays] = useState(7);
   const insightsSummaries = useMemo(() => getLastNDaysSummaries(allFoodLogs, 7), [allFoodLogs]);
@@ -71,6 +75,9 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // Dictation writes into the same aiInput the typed path uses, so the AI
+  // parser is shared and speech is purely additive.
+  const speech = useSpeechInput((text) => setAiInput((prev) => (prev ? `${prev} ${text}` : text)));
   const [selectedNutrient, setSelectedNutrient] = useState<string | null>(null);
   const [mealCriteria, setMealCriteria] = useState('');
 const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
@@ -83,6 +90,7 @@ const [recipeModal, setRecipeModal] = useState<MealSuggestion | null>(null);
 const [isAddingWater, setIsAddingWater] = useState(false);
 const [waterInput, setWaterInput] = useState('');
 const [showFavourites, setShowFavourites] = useState(false);
+const [coach, setCoach] = useState<{ subject: BodySystemScore; systems: BodySystemScore[] } | null>(null);
 const [isExporting, setIsExporting] = useState(false);
 const [exportError, setExportError] = useState<string | null>(null);
 const [favMealType, setFavMealType] = useState<MealType>('Breakfast');
@@ -95,23 +103,18 @@ const isViewingToday = selectedDate === toISODateString();
   // Export state
   const reportRef = useRef<HTMLDivElement>(null);
   
-  // -- Derived Data with robust Number casting to prevent string concatenation --
+  // `Number(x) || 0`, NOT `Number(x || 0)` — a string value like "420 kcal"
+  // yields NaN under the latter and poisons every total it reaches.
   const consumedMacros = logs.reduce((acc, log) => ({
-    calories: acc.calories + Number(log.food.calories || 0),
-    protein: acc.protein + Number(log.food.protein || 0),
-    carbs: acc.carbs + Number(log.food.carbs || 0),
-    fat: acc.fat + Number(log.food.fat || 0),
+    calories: acc.calories + (Number(log.food.calories) || 0),
+    protein: acc.protein + (Number(log.food.protein) || 0),
+    carbs: acc.carbs + (Number(log.food.carbs) || 0),
+    fat: acc.fat + (Number(log.food.fat) || 0),
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-  // Consolidate micros using Number() for accuracy
-  const consumedMicros: Record<string, number> = {};
-  logs.forEach(log => {
-    if (log.food.micros) {
-      Object.entries(log.food.micros).forEach(([name, amount]) => {
-        consumedMicros[name] = (consumedMicros[name] || 0) + Number(amount || 0);
-      });
-    }
-  });
+  // `logs` is already the selected day's logs, so no date filter is needed here.
+  // Shared with computeMicroScore so the tiles and the score can never disagree.
+  const consumedMicros = useMemo(() => computeConsumedMicros(logs), [logs]);
 
   const microScore = computeMicroScore(logs, selectedDate);
 
@@ -161,10 +164,6 @@ const isViewingToday = selectedDate === toISODateString();
     }
   };
 
-  const handleManualAdd = (food: FoodItem) => {
-    onAddFood(selectedMeal, food);
-    setIsAdding(false);
-  };
 
   const deleteLog = (id: string) => {
     if (window.confirm("Are you sure you want to delete this item?")) {
@@ -173,8 +172,9 @@ const isViewingToday = selectedDate === toISODateString();
   };
 
   const ProgressBar = ({ current, target, colorClass, label, unit }: any) => {
-    const val = Number(current || 0);
-    const tgt = Number(target || 1);
+    // Same coercion rule as everywhere else: Number(x) || fallback.
+    const val = Number(current) || 0;
+    const tgt = Number(target) || 1;
     const pct = Math.min((val / tgt) * 100, 100);
     return (
       <div className="mb-4 break-inside-avoid">
@@ -300,22 +300,24 @@ const isViewingToday = selectedDate === toISODateString();
 
   return (
     <div className="space-y-6">
-      {/* wraps instead of squashing the sub-tabs against the reset button on phones */}
-      <div className="flex flex-wrap justify-between items-center gap-3">
-        <div className="flex gap-1 bg-raised p-1 rounded-control w-fit max-w-full overflow-x-auto">
-            <button onClick={() => setActiveTab('log')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'log' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Food Log</button>
-            <button onClick={() => setActiveTab('trends')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'trends' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Trends</button>
-            <button onClick={() => setActiveTab('analysis')} className={`px-4 py-2 rounded-[8px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'analysis' ? 'bg-card shadow-sm dark:shadow-none text-nutri' : 'text-fg-soft hover:text-fg'}`}>Analysis</button>
-        </div>
-        {activeTab === 'log' && isViewingToday && (
-          <Button variant="outline" onClick={() => setShowResetConfirm(true)} className="text-sm font-bold text-fat border-fat/30 hover:bg-fat/10 hover:text-fat">
-            Reset Today's Log
-          </Button>
-        )}
-      </div>
+      {/* Hidden when Dashboard drives the view: the top-level tabs replace it. */}
+      {!view && (
+        <SegmentedControl<'log' | 'trends' | 'analysis'>
+          role="tablist"
+          label="Nutrition view"
+          value={activeTab}
+          onChange={setActiveTab}
+          segmentClassName="px-4 py-2 rounded-[8px] text-sm font-semibold whitespace-nowrap"
+          segments={[
+            { value: 'log', label: 'Food Log' },
+            { value: 'trends', label: 'Trends' },
+            { value: 'analysis', label: 'Analysis' },
+          ]}
+        />
+      )}
 
       {showResetConfirm && (
-        <Modal onClose={() => setShowResetConfirm(false)} labelledBy="reset-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <Modal onClose={() => setShowResetConfirm(false)} labelledBy="reset-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
              <div className="flex justify-between items-center">
                 <h3 id="reset-modal-title" className="text-xl font-bold text-fg">Reset Today's Log?</h3>
                 <button onClick={() => setShowResetConfirm(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
@@ -344,7 +346,7 @@ const isViewingToday = selectedDate === toISODateString();
                 const { title, subtitle } = formatNavigatorLabel(selectedDate);
                 const tomorrowISO = addDaysISO(toISODateString(), 1);
                 return (
-                  <div className="flex items-center justify-between bg-card p-2.5 rounded-card shadow-sm dark:shadow-none border border-edge mb-4">
+                  <div className="flex items-center justify-between bg-card p-2.5 rounded-card shadow-e1 border border-edge mb-4">
                     <button
                       onClick={() => onSelectDate(addDaysISO(selectedDate, -1))}
                       aria-label="Previous day"
@@ -368,7 +370,7 @@ const isViewingToday = selectedDate === toISODateString();
                     </button>
                   </div>
                 );
-              })()}<div className="bg-card p-6 rounded-card shadow-sm dark:shadow-none border border-edge mb-5 flex justify-between items-center">
+              })()}<div className="bg-card p-6 rounded-card shadow-e1 border border-edge mb-5 flex justify-between items-center">
                 <div>
                    <h3 className="font-semibold text-fg-soft text-xs uppercase tracking-wide">Calories Remaining</h3>
                    <div className="nums text-4xl font-bold text-fg">{Math.max(0, Math.round(targets.calories - consumedMacros.calories))}</div>
@@ -383,7 +385,7 @@ const isViewingToday = selectedDate === toISODateString();
               {isViewingToday ? (
                 <>
                   {/* Water progress bar */}
-                  <div className="bg-card p-4 rounded-card shadow-sm dark:shadow-none border border-edge mb-4">
+                  <div className="bg-card p-4 rounded-card shadow-e1 border border-edge mb-4">
                     <div className="flex justify-between items-center mb-2">
                       <span className="inline-flex items-center gap-1.5 font-semibold text-hydro text-sm"><IconDroplet size={16} /> Water Today</span>
                       <span className="nums text-sm font-semibold text-fg-soft">{waterLog.mlConsumed} / {waterGoalMl} ml <span className="text-fg-mute font-normal">({waterPct}%)</span></span>
@@ -472,10 +474,10 @@ const isViewingToday = selectedDate === toISODateString();
                 {MEAL_TYPES.map(type => {
                   const mealLogs = logs.filter(l => l.type === type);
                   return (
-                    <div key={type} className="bg-card rounded-card border border-edge shadow-sm dark:shadow-none overflow-hidden">
+                    <div key={type} className="bg-card rounded-card border border-edge shadow-e1 overflow-hidden">
                       <div className="bg-raised p-4 flex justify-between items-center border-b border-edge">
                         <h4 className="font-bold text-fg">{type}</h4>
-                        <span className="nums text-sm text-fg-soft">{mealLogs.reduce((acc, l) => acc + Number(l.food.calories || 0), 0)} kcal</span>
+                        <span className="nums text-sm text-fg-soft">{mealLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0)} kcal</span>
                       </div>
                       <div className="divide-y divide-edge">
                         {mealLogs.length === 0 ? (
@@ -533,14 +535,47 @@ const isViewingToday = selectedDate === toISODateString();
                      placeholder="e.g. 2 eggs and a banana"
                      aria-invalid={!!aiError}
                      aria-describedby={aiError ? 'ai-food-error' : undefined}
-                     className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none"
+                     className="flex-1 p-3 bg-card border-2 border-edge rounded-control text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page"
                    />
-                   <Button onClick={handleAiParse} disabled={isAiLoading || !aiInput}>{isAiLoading ? 'Adding…' : 'Add'}</Button>
+                   {speech.supported && (
+                     <button
+                       type="button"
+                       onClick={speech.listening ? speech.stop : speech.start}
+                       aria-label={speech.listening ? 'Stop dictating' : 'Dictate your food'}
+                       aria-pressed={speech.listening}
+                       disabled={isAiLoading}
+                       className={`shrink-0 w-12 rounded-control border-2 flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50 ${
+                         speech.listening
+                           ? 'border-fat bg-fat/10 text-fat animate-pulse'
+                           : 'border-edge text-fg-soft hover:border-nutri hover:text-nutri'
+                       }`}
+                     >
+                       {speech.listening ? <IconPlayerStopFilled size={18} /> : <IconMicrophone size={18} />}
+                     </button>
+                   )}
+                   <Button onClick={handleAiParse} disabled={!aiInput} loading={isAiLoading} loadingLabel="Adding…">Add</Button>
                  </div>
-                 {aiError && (
-                   <p id="ai-food-error" role="alert" className="mt-2 text-sm text-fat">{aiError}</p>
+                 {speech.listening && (
+                   <p className="mt-2 text-sm text-fg-soft" aria-live="polite">Listening… say what you ate.</p>
+                 )}
+                 {(aiError || speech.error) && (
+                   <p id="ai-food-error" role="alert" className="mt-2 text-sm text-fat">{aiError ?? speech.error}</p>
                  )}
               </div>
+            </div>
+          )}
+
+          {/* Destructive, so it sits after the log it clears rather than above
+              it. Nobody arrives on this screen wanting to erase the day. */}
+          {isViewingToday && (
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="danger"
+                onClick={() => setShowResetConfirm(true)}
+                className="text-sm font-bold"
+              >
+                Reset Today&apos;s Log
+              </Button>
             </div>
           )}
         </div>
@@ -555,22 +590,17 @@ const isViewingToday = selectedDate === toISODateString();
             plan={plan}
           />
           <div className="flex justify-end">
-            <div className="flex gap-1 bg-raised p-1 rounded-control">
-              {rangeOptions.map((days) => (
-                <button
-                  key={days}
-                  type="button"
-                  onClick={() => setRangeDays(days)}
-                  className={`nums px-4 py-1.5 rounded-[8px] text-sm font-semibold transition-all ${
-                    rangeDays === days
-                      ? 'bg-card shadow-sm dark:shadow-none text-nutri'
-                      : 'text-fg-soft hover:text-fg'
-                  }`}
-                >
-                  {days}D
-                </button>
-              ))}
-            </div>
+            <SegmentedControl<number>
+              label="Trend range"
+              nums
+              value={rangeDays}
+              onChange={setRangeDays}
+              segments={rangeOptions.map((days) => ({
+                value: days,
+                label: `${days}D`,
+                ariaLabel: `Last ${days} days`,
+              }))}
+            />
           </div>
           <TrendCharts
             dailySummaries={trendDailySummaries}
@@ -580,68 +610,25 @@ const isViewingToday = selectedDate === toISODateString();
             rangeDays={rangeDays}
           />
 
-          <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-            <h3 className="text-lg font-bold text-fg mb-1">Micronutrient Snapshot</h3>
-            <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
-            <div className="space-y-4">
-              {PRIORITY_MICROS.map((key) => {
-                const info = NUTRIENT_INFO[key];
-                if (!info?.targetVal) return null;
-                const current = consumedMicros[key] || 0;
-                const pct = Math.round((current / info.targetVal) * 100);
-                const barPct = Math.min(pct, 100);
-                const colorClass =
-                  pct >= 80 ? 'bg-nutri' : pct >= 40 ? 'bg-spark' : 'bg-fat';
-                const displayAmount =
-                  current > 0 ? Math.round(current * 10) / 10 : 0;
-
-                return (
-                  <div key={key}>
-                    <div className="flex justify-between items-baseline gap-3 mb-1.5">
-                      <span className="text-sm font-semibold text-fg">{key}</span>
-                      <span className="nums text-xs text-fg-soft shrink-0">
-                        {displayAmount}
-                        {info.unit}
-                        <span className="mx-1 text-fg-mute">·</span>
-                        <span className={`font-bold ${pct >= 80 ? 'text-nutri' : pct >= 40 ? 'text-spark' : 'text-fat'}`}>
-                          {pct}% DV
-                        </span>
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-track rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-500 ${colorClass}`}
-                        style={{ width: `${barPct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
         </div>
       )}
 
       {activeTab === 'analysis' && (
         <div className="animate-fade-in space-y-8">
-          <div className="flex flex-col items-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleExportPDF}
-              disabled={isExporting}
-              className="inline-flex items-center gap-1.5 text-sm font-bold"
-            >
-              <IconFileText size={16} /> {isExporting ? 'Preparing…' : 'Export PDF'}
-            </Button>
-            {exportError && (
-              <p role="alert" className="text-sm text-fat">{exportError}</p>
-            )}
-          </div>
           <div ref={reportRef} className="space-y-8">
 
+           {/* Body-system support leads the tab: it is the surface that makes
+               the raw percentages below legible. Inside reportRef so the
+               exported PDF leads with it too. Deterministic, no AI call. */}
+           <BodySystems
+             consumedMicros={consumedMicros}
+             consumedMacros={consumedMacros}
+             targets={targets}
+             onAskCoach={(subject, systems) => setCoach({ subject, systems })}
+           />
+
            {/* ── Daily Summary (water + weight) — included in PDF export ── */}
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-             <h3 className="text-lg font-bold text-fg mb-4">Daily Summary</h3>
+           <Card title="Daily Summary">
              <div className="grid grid-cols-2 gap-4">
                {/* Water */}
                <div className="bg-hydro/10 rounded-tile p-4">
@@ -673,7 +660,7 @@ const isViewingToday = selectedDate === toISODateString();
                  )}
                </div>
              </div>
-           </section>
+           </Card>
 
            {/* ── Macro donut chart ── */}
            {(() => {
@@ -690,8 +677,7 @@ const isViewingToday = selectedDate === toISODateString();
              ];
              const hasData = totalKcal > 0;
              return (
-               <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-                 <h3 className="text-lg font-bold text-fg mb-4">Calorie Breakdown</h3>
+               <Card title="Calorie Breakdown">
                  {hasData ? (
                    <div className="flex flex-col sm:flex-row items-center gap-6">
                      <div className="relative w-44 h-44 shrink-0">
@@ -732,7 +718,7 @@ const isViewingToday = selectedDate === toISODateString();
                      <p className="text-sm font-medium">Log food to see your macro breakdown</p>
                    </div>
                  )}
-               </section>
+               </Card>
              );
            })()}
 
@@ -764,16 +750,55 @@ const isViewingToday = selectedDate === toISODateString();
              )}
            </section>
 
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-             <h3 className="text-lg font-bold text-fg mb-6">Macro Targets</h3>
+           {/* Priority-nutrient bars. Lived in Trends in v1; it answers
+               "how am I doing today?", not "how has the week gone?" ── */}
+           <Card title="Micronutrient Snapshot">
+             <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
+             <div className="space-y-4">
+               {PRIORITY_MICROS.map((key) => {
+                 const info = NUTRIENT_INFO[key];
+                 if (!info?.targetVal) return null;
+                 const current = consumedMicros[key] || 0;
+                 const pct = Math.round((current / info.targetVal) * 100);
+                 const barPct = Math.min(pct, 100);
+                 const colorClass =
+                   pct >= 80 ? 'bg-nutri' : pct >= 40 ? 'bg-spark' : 'bg-fat';
+                 const displayAmount =
+                   current > 0 ? Math.round(current * 10) / 10 : 0;
+
+                 return (
+                   <div key={key}>
+                     <div className="flex justify-between items-baseline gap-3 mb-1.5">
+                       <span className="text-sm font-semibold text-fg">{key}</span>
+                       <span className="nums text-xs text-fg-soft shrink-0">
+                         {displayAmount}
+                         {info.unit}
+                         <span className="mx-1 text-fg-mute">·</span>
+                         <span className={`font-bold ${pct >= 80 ? 'text-nutri' : pct >= 40 ? 'text-spark' : 'text-fat'}`}>
+                           {pct}% DV
+                         </span>
+                       </span>
+                     </div>
+                     <div className="h-2.5 bg-track rounded-full overflow-hidden">
+                       <div
+                         className={`h-full transition-all duration-500 ${colorClass}`}
+                         style={{ width: `${barPct}%` }}
+                       />
+                     </div>
+                   </div>
+                 );
+               })}
+             </div>
+           </Card>
+
+           <Card title="Macro Targets">
              <ProgressBar label="Protein" current={consumedMacros.protein} target={targets.protein} unit="g" colorClass="bg-protein" />
              <ProgressBar label="Carbohydrates" current={consumedMacros.carbs} target={targets.carbs} unit="g" colorClass="bg-carbs" />
              <ProgressBar label="Fats" current={consumedMacros.fat} target={targets.fat} unit="g" colorClass="bg-fat" />
              <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
-           </section>
+           </Card>
 
-           <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-              <h3 className="text-lg font-bold text-fg mb-6">Micronutrient Breakdown</h3>
+           <Card title="Micronutrient Breakdown">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                  {Object.keys(NUTRIENT_INFO).filter(k => !['Protein','Carbohydrates','Fats','Fiber','Sugar'].includes(k)).map(key => {
                     const amount = Number(consumedMicros[key] || 0);
@@ -788,9 +813,9 @@ const isViewingToday = selectedDate === toISODateString();
                     )
                  })}
               </div>
-           </section>
+           </Card>
 
-           <section className="rounded-card border border-edge shadow-sm dark:shadow-none overflow-hidden">
+           <section className="rounded-card border border-edge shadow-e1 overflow-hidden">
               {nutrientGaps.length > 0 ? (
                 <>
                   <div className="bg-gradient-to-r from-spark to-fat px-6 py-4">
@@ -803,7 +828,7 @@ const isViewingToday = selectedDate === toISODateString();
                     {nutrientGaps.map(({ key, displayPct, sources }) => (
                       <div
                         key={key}
-                        className="bg-card p-4 rounded-tile border border-edge shadow-sm dark:shadow-none"
+                        className="bg-card p-4 rounded-tile border border-edge shadow-e1"
                       >
                         <div className="flex justify-between items-start gap-3 mb-3">
                           <h4 className="font-bold text-fg">{key}</h4>
@@ -843,10 +868,38 @@ const isViewingToday = selectedDate === toISODateString();
               )}
            </section>
           </div>
+
+          {/* Sits after the report it exports, not floating above the hero.
+              Outside reportRef so the button never appears in the PDF. */}
+          <div className="flex flex-col items-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              loading={isExporting}
+              loadingLabel="Preparing…"
+              className="inline-flex items-center gap-1.5 text-sm font-bold"
+            >
+              <IconFileText size={16} /> Export PDF
+            </Button>
+            {exportError && (
+              <p role="alert" className="text-sm text-fat">{exportError}</p>
+            )}
+          </div>
         </div>
       )}
+      {coach && (
+        <Coach
+          profile={profile}
+          systems={coach.systems}
+          subject={coach.subject}
+          planFocus={plan?.nutritionFocus}
+          dailyCalorieTarget={targets.calories}
+          onClose={() => setCoach(null)}
+        />
+      )}
+
       {selectedNutrient && NUTRIENT_INFO[selectedNutrient] && (
-        <Modal onClose={() => setSelectedNutrient(null)} labelledBy="nutrient-modal-title" className="bg-card rounded-modal p-6 max-w-md w-full shadow-2xl">
+        <Modal onClose={() => setSelectedNutrient(null)} labelledBy="nutrient-modal-title" className="bg-card rounded-modal p-6 max-w-md w-full shadow-e3">
             <div className="flex justify-between items-start mb-4">
                <h3 id="nutrient-modal-title" className="text-2xl font-bold text-fg">{selectedNutrient}</h3>
                <button onClick={() => setSelectedNutrient(null)} aria-label="Close" className="text-fg-mute hover:text-fg p-1"><IconX size={20} /></button>
@@ -879,7 +932,7 @@ const isViewingToday = selectedDate === toISODateString();
         </Modal>
       )}
       {isAddingSunlight && (
-        <Modal onClose={() => setIsAddingSunlight(false)} labelledBy="sunlight-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <Modal onClose={() => setIsAddingSunlight(false)} labelledBy="sunlight-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
                  <div className="flex justify-between items-center">
                     <h3 id="sunlight-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconSun size={20} className="text-spark" /> Log Sunlight</h3>
                     <button onClick={() => setIsAddingSunlight(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
@@ -887,56 +940,57 @@ const isViewingToday = selectedDate === toISODateString();
                  <p className="text-sm text-fg-soft">
                     Sun exposure helps your body produce Vitamin D.
                  </p>
-                 <div>
-                    <label className="block text-xs font-semibold text-fg-soft uppercase mb-1">Duration (Minutes)</label>
-                    <input
-                        type="number"
-                        autoFocus
-                        className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-spark focus:outline-none text-lg font-bold text-fg placeholder:text-fg-mute"
-                        placeholder="e.g. 15"
-                        value={sunlightMins}
-                        onChange={e => setSunlightMins(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSaveSunlight()}
-                    />
-                 </div>
+                 <Field
+                    label="Duration (minutes)"
+                    accent="spark"
+                    emphasis
+                    suffix="min"
+                    type="number"
+                    autoFocus
+                    placeholder="e.g. 15"
+                    value={sunlightMins}
+                    onChange={e => setSunlightMins(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveSunlight()}
+                 />
                  <Button variant="primary" className="bg-spark hover:brightness-105 w-full" onClick={handleSaveSunlight}>
                     Add Vitamin D
                  </Button>
         </Modal>
       )}
       {isAddingWater && (
-        <Modal onClose={() => setIsAddingWater(false)} labelledBy="water-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <Modal onClose={() => setIsAddingWater(false)} labelledBy="water-modal-title" className="bg-card rounded-modal p-6 max-w-sm w-full shadow-e3 space-y-4">
             <div className="flex justify-between items-center">
               <h3 id="water-modal-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg"><IconDroplet size={20} className="text-hydro" /> Log Water</h3>
               <button onClick={() => setIsAddingWater(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={18} /></button>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-fg-soft uppercase mb-1">Amount (ml)</label>
-              <input
-                type="number"
-                autoFocus
-                className="w-full p-3 bg-card border-2 border-edge rounded-control focus:border-hydro focus:outline-none text-lg font-bold text-fg placeholder:text-fg-mute"
-                placeholder="e.g. 350"
-                value={waterInput}
-                onChange={e => setWaterInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCustomWater()}
-              />
-            </div>
+            <Field
+              label="Amount"
+              accent="hydro"
+              emphasis
+              suffix="ml"
+              type="number"
+              autoFocus
+              placeholder="e.g. 350"
+              value={waterInput}
+              onChange={e => setWaterInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCustomWater()}
+            />
             <Button variant="primary" className="bg-hydro hover:brightness-105 w-full" onClick={handleCustomWater}>
               Add Water
             </Button>
         </Modal>
       )}
       {isMealBuilderOpen && (
-        <Modal onClose={() => setIsMealBuilderOpen(false)} labelledBy="mealbuilder-modal-title" className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <Modal onClose={() => setIsMealBuilderOpen(false)} labelledBy="mealbuilder-modal-title" className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-e3 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 id="mealbuilder-modal-title" className="inline-flex items-center gap-2 text-2xl font-bold text-fg"><IconSparkles size={22} className="text-nutri" /> Smart Meal Builder</h3>
               <button onClick={() => setIsMealBuilderOpen(false)} aria-label="Close" className="text-fg-mute hover:text-fg"><IconX size={22} /></button>
             </div>
             <div className="mb-6">
-              <label className="block text-sm font-bold text-fg mb-2">Describe what you need</label>
+              <label htmlFor="meal-criteria" className="block text-xs font-semibold uppercase tracking-wider text-fg-soft mb-1.5">Describe what you need</label>
               <textarea
-                className="w-full p-4 bg-card border-2 border-edge rounded-control focus:border-nutri focus:outline-none text-fg placeholder:text-fg-mute mb-3"
+                id="meal-criteria"
+                className="w-full p-4 bg-card border-2 border-edge rounded-control focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-fg placeholder:text-fg-mute mb-3"
                 placeholder="e.g., 'A high protein vegan breakfast under 400 calories'"
                 rows={2}
                 value={mealCriteria}

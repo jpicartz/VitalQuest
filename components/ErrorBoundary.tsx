@@ -55,7 +55,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     return (
       <div className="min-h-screen bg-page text-fg flex items-center justify-center p-6">
-        <div className="bg-card border border-edge rounded-card p-8 max-w-md w-full text-center shadow-sm dark:shadow-none">
+        <div className="bg-card border border-edge rounded-card p-8 max-w-md w-full text-center shadow-e1">
           <div className="w-12 h-12 rounded-full bg-spark/15 text-spark flex items-center justify-center mx-auto mb-4">
             <IconAlertTriangle size={24} />
           </div>

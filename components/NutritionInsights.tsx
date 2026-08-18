@@ -69,11 +69,17 @@ export const NutritionInsights: React.FC<NutritionInsightsProps> = ({
           <h3 className="inline-flex items-center gap-2 text-xl font-bold"><IconSparkles size={20} /> AI Pattern Insights</h3>
           <p className="nums text-sm text-white/70 mt-1">Based on your last 7 days ({daysLogged} days logged)</p>
         </div>
-        <Button variant="outline" className="!py-1.5 !px-3 text-xs bg-white/10 border-white/30 text-white hover:bg-white/20 shrink-0" onClick={loadInsights} disabled={isLoading}>
-          {isLoading ? 'Analyzing…' : 'Refresh'}
+        <Button variant="outline" className="!py-1.5 !px-3 text-xs bg-white/10 border-white/30 text-white hover:bg-white/20 shrink-0" onClick={loadInsights} loading={isLoading} loadingLabel="Analyzing…">
+          Refresh
         </Button>
       </div>
-      {isLoading && !insights && <p className="text-white/80 text-sm py-4">Reading your logs…</p>}
+      {isLoading && !insights && (
+        <div role="status" aria-label="Reading your logs" className="space-y-3 py-2">
+          <div className="h-5 w-3/5 rounded-control bg-white/20 animate-pulse" />
+          <div className="h-3.5 w-full rounded-control bg-white/15 animate-pulse" />
+          <div className="h-3.5 w-4/5 rounded-control bg-white/15 animate-pulse" />
+        </div>
+      )}
       {error && <p className="text-sm bg-white/10 p-3 rounded-control">{error} <button onClick={loadInsights} className="underline font-bold ml-1">Retry</button></p>}
       {insights && (
         <div className="space-y-4">

@@ -22,7 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   labelledBy,
   ariaLabel,
-  className = 'bg-card rounded-modal p-6 max-w-lg w-full shadow-2xl',
+  className = 'bg-card rounded-modal p-6 max-w-lg w-full shadow-e3',
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);

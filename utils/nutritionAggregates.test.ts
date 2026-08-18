@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   computeMicroScore,
+  computeConsumedMicros,
   getLastNDaysSummaries,
   getWeeklyMacroTotals,
   buildInsightsPayload,
@@ -32,6 +33,65 @@ const log = (f: Partial<FoodItem>, dateISO = '2026-07-31'): MealLog => ({
   type: 'Breakfast',
   food: food(f),
   timestamp: timestampForISODate(dateISO),
+});
+
+describe('computeConsumedMicros', () => {
+  it('returns an empty map for no logs', () => {
+    expect(computeConsumedMicros([])).toEqual({});
+  });
+
+  it('sums the same nutrient across logs', () => {
+    const result = computeConsumedMicros([
+      log({ micros: { Fiber: 10, Iron: 2 } }),
+      log({ micros: { Fiber: 5 } }),
+    ]);
+    expect(result).toEqual({ Fiber: 15, Iron: 2 });
+  });
+
+  it('filters to a single day when dateISO is given', () => {
+    const logs = [
+      log({ micros: { Fiber: 10 } }, '2026-07-31'),
+      log({ micros: { Fiber: 5 } }, '2026-07-30'),
+    ];
+    expect(computeConsumedMicros(logs, '2026-07-31')).toEqual({ Fiber: 10 });
+  });
+
+  it('keeps nutrients outside the priority list', () => {
+    // The breakdown grid renders all 26 non-macro nutrients, not just the 10
+    // scored ones, so the aggregation must not filter.
+    expect(computeConsumedMicros([log({ micros: { Biotin: 12, Selenium: 30 } })]))
+      .toEqual({ Biotin: 12, Selenium: 30 });
+  });
+
+  // ── Regression: NutritionTracker used to run its own copy of this loop with
+  // `Number(x || 0)`, so the breakdown tiles could render NaN directly beneath
+  // a correct Micronutrient Score. One aggregation path prevents that.
+  it.each([
+    ['28g', 0],
+    ['abc', 0],
+    ['', 0],
+    [null, 0],
+    [undefined, 0],
+    ['28', 28],
+  ])('coerces %o to %o without producing NaN', (input, expected) => {
+    const result = computeConsumedMicros([log({ micros: { Fiber: input } as never })]);
+    expect(Number.isNaN(result.Fiber)).toBe(false);
+    expect(result.Fiber).toBe(expected);
+  });
+
+  it('does not let one unparseable value poison other nutrients', () => {
+    const result = computeConsumedMicros([log({ micros: { Fiber: '28g', Iron: 8 } as never })]);
+    expect(result.Iron).toBe(8);
+    expect(Number.isNaN(result.Fiber)).toBe(false);
+  });
+
+  it('agrees with the score it feeds', () => {
+    // The two must never disagree — that was the on-screen contradiction.
+    const logs = [log({ micros: { ...perfectMicros(), Fiber: '28g' } as never })];
+    const consumed = computeConsumedMicros(logs);
+    expect(Number.isNaN(consumed.Fiber)).toBe(false);
+    expect(computeMicroScore(logs)).toBe(90);
+  });
 });
 
 describe('computeMicroScore', () => {

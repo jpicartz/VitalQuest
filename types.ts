@@ -104,6 +104,13 @@ export interface GamificationState {
   lastLogDate?: string;        // ISO date of last food log (for streak)
 }
 
+/** A user-set weight target. Validated by utils/goalProjection before use. */
+export interface StoredWeightGoal {
+  targetKg: number;
+  targetDate: string;  // ISO date YYYY-MM-DD
+  setOn: string;       // ISO date the goal was created
+}
+
 export interface WaterLog {
   date: string;       // ISO date YYYY-MM-DD
   mlConsumed: number;
@@ -162,6 +169,13 @@ export interface NutrientEducation {
   dailyValue?: string; // Text representation e.g. "90mg"
   targetVal?: number;  // Numeric value for percentage calc
   unit?: string;       // Unit string e.g. "mg", "mcg"
+  /**
+   * How to read `targetVal`. 'goal' (the default) means more is better up to
+   * the target. 'ceiling' means the target is an upper limit — Sodium and Sugar
+   * are stored identically to goals, so any generic consumed/target loop would
+   * otherwise reward a salty day.
+   */
+  direction?: 'goal' | 'ceiling';
 }
 
 export interface MealSuggestion {

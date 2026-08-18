@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from './ui/Card';
 import { SupplementRecommendation, WellnessPlan } from '../types';
 import {
   IconSparkles, IconRocket, IconSalad, IconPill, IconCheck, IconArrowUp,
@@ -6,7 +7,7 @@ import {
 } from '@tabler/icons-react';
 
 const SupplementCard: React.FC<{ supp: SupplementRecommendation }> = ({ supp }) => (
-  <div className="bg-card border border-edge p-4 rounded-tile shadow-sm dark:shadow-none mb-3">
+  <div className="bg-card border border-edge p-4 rounded-tile shadow-e1 mb-3">
     <div className="flex justify-between items-start gap-2">
       <h4 className="font-bold text-lg text-fg">{supp.name}</h4>
       <span className={`text-xs px-2 py-1 rounded-full font-bold shrink-0 ${
@@ -52,7 +53,7 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
 
       {/* Strengths & Improvements */}
       <div className="grid md:grid-cols-2 gap-5">
-        <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+        <Card>
           <div className="flex items-center gap-2 mb-4">
              <IconSparkles size={22} className="text-nutri" />
              <h3 className="font-bold text-fg text-lg">What You're Doing Well</h3>
@@ -65,9 +66,9 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
 
-        <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
+        <Card>
           <div className="flex items-center gap-2 mb-4">
              <IconRocket size={22} className="text-spark" />
              <h3 className="font-bold text-fg text-lg">Areas for Improvement</h3>
@@ -80,7 +81,7 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">

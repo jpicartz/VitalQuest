@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
+import { ProfileProvider } from './contexts/ProfileContext';
+import { LogsProvider } from './contexts/LogsContext';
 import {
   UserProfile, CalculatedMetrics, WellnessPlan, GamificationState,
-  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry,
+  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry, StoredWeightGoal,
 } from './types';
 import { generateWellnessPlan } from './services/claudeService';
 import { toISODateString, isSameISODate, timestampForISODate } from './utils/dateUtils';
@@ -36,6 +38,7 @@ const App: React.FC = () => {
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
   const [favouriteFoods, setFavouriteFoods] = useState<FoodItem[]>([]);
   const [lifetimeQuestsCompleted, setLifetimeQuestsCompleted] = useState<number>(0);
+  const [weightGoal, setWeightGoal] = useState<StoredWeightGoal | null>(null);
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
 
   // ── Theme (dual-mode) — isolated from vitalQuestData, own localStorage key ──
@@ -82,6 +85,7 @@ const App: React.FC = () => {
 
           setFoodLogs(parsed.foodLogs || []);
           setLifetimeQuestsCompleted(parsed.lifetimeQuestsCompleted || 0);
+          setWeightGoal(parsed.weightGoal || null);
 
           // Water log — reset if new day
           const savedWater: WaterLog = parsed.waterLog || { date: today, mlConsumed: 0 };
@@ -104,9 +108,10 @@ const App: React.FC = () => {
       localStorage.setItem('vitalQuestData', JSON.stringify({
         profile, metrics, plan, gamification, foodLogs,
         waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs,
+        weightGoal,
       }));
     }
-  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs]);
+  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, weightGoal]);
 
   // ── Badge checker — runs whenever gamification changes ────────────────────
   const runBadgeCheck = useCallback((
@@ -322,38 +327,42 @@ const App: React.FC = () => {
           </div>
         ) : (
           profile && metrics && plan && (
-            <Dashboard
-              profile={profile}
-              metrics={metrics}
-              plan={plan}
-              gamification={gamification}
-              onUpdateGamification={handleUpdateGamification}
-              onReset={handleReset}
-              foodLogs={selectedLogs}
-              onAddFood={handleAddFood}
-              onUpdateLog={() => {}}
-              onDeleteLog={handleDeleteLog}
-              onResetTodayLog={handleResetTodayLog}
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              allFoodLogs={foodLogs}
-              // Water
-              waterLog={waterLog}
-              onLogWater={handleLogWater}
-              onResetWater={handleResetWater}
-              // Weight
-              weightHistory={weightHistory}
-              onLogWeight={handleLogWeight}
-              // Favourites
-              favouriteFoods={favouriteFoods}
-              onAddFavourite={handleAddFavourite}
-              onRemoveFavourite={handleRemoveFavourite}
-              onQuickAddFavourite={handleQuickAddFavourite}
-              // Exercise
-              exerciseLogs={exerciseLogs}
-              onLogExercise={handleLogExercise}
-              onDeleteExercise={handleDeleteExercise}
-            />
+            <ProfileProvider profile={profile} metrics={metrics} plan={plan}>
+              <LogsProvider
+                logs={{
+                  foodLogs: selectedLogs,
+                  allFoodLogs: foodLogs,
+                  selectedDate,
+                  waterLog,
+                  weightHistory,
+                  favouriteFoods,
+                  exerciseLogs,
+                  weightGoal,
+                }}
+                actions={{
+                  onAddFood: handleAddFood,
+                  onUpdateLog: () => {},
+                  onDeleteLog: handleDeleteLog,
+                  onResetTodayLog: handleResetTodayLog,
+                  onSelectDate: setSelectedDate,
+                  onLogWater: handleLogWater,
+                  onResetWater: handleResetWater,
+                  onLogWeight: handleLogWeight,
+                  onSetWeightGoal: setWeightGoal,
+                  onAddFavourite: handleAddFavourite,
+                  onRemoveFavourite: handleRemoveFavourite,
+                  onQuickAddFavourite: handleQuickAddFavourite,
+                  onLogExercise: handleLogExercise,
+                  onDeleteExercise: handleDeleteExercise,
+                }}
+              >
+                <Dashboard
+                  gamification={gamification}
+                  onUpdateGamification={handleUpdateGamification}
+                  onReset={handleReset}
+                />
+              </LogsProvider>
+            </ProfileProvider>
           )
         )}
       </main>

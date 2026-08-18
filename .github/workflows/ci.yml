@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  # Every branch, not just main — a feature branch that only gets verified at
+  # merge time is verified too late, and long-lived branches like v2 would
+  # otherwise run unchecked for their whole life.
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   build:

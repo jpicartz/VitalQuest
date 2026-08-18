@@ -27,6 +27,23 @@
     --macro-carbs: 245 158 11;     /* #f59e0b */
     --macro-fat: 244 63 94;        /* #f43f5e */
     --track: 230 227 221;          /* #e6e3dd ring/bar track */
+
+    /* ── Elevation ────────────────────────────────────────────────────────
+       Light mode separates surfaces with shadow; dark mode separates them by
+       surface *value* (page → card → raised are three distinct navies), so a
+       shadow there only muddies the edge. Both are defined here so a component
+       writes `shadow-e1` once instead of `shadow-sm dark:shadow-none` — which
+       was repeated verbatim 17 times before these existed.
+       Every level carries a real offset and a soft blur: no zero-offset halos. */
+    --elev-1: 0 1px 2px -1px rgb(28 28 30 / 0.06), 0 1px 3px 0 rgb(28 28 30 / 0.05);
+    --elev-2: 0 2px 4px -2px rgb(28 28 30 / 0.07), 0 6px 14px -4px rgb(28 28 30 / 0.09);
+    --elev-3: 0 8px 14px -6px rgb(28 28 30 / 0.10), 0 20px 40px -12px rgb(28 28 30 / 0.16);
+    /* Spacing rhythm. Tailwind's numeric scale still does the work; these name
+       the three distances the layout actually uses so they stay consistent:
+       inside a group, between groups, between sections. */
+    --space-tight: 0.75rem;
+    --space-group: 1.25rem;
+    --space-section: 2rem;
   }
 
   .dark {
@@ -46,6 +63,13 @@
     --macro-carbs: 251 191 36;     /* #fbbf24 */
     --macro-fat: 251 113 133;      /* #fb7185 */
     --track: 30 41 59;             /* #1e293b */
+
+    /* Dark surfaces separate by value, not shadow. Level 1 goes to nothing;
+       2 and 3 keep just enough to lift genuinely floating things (sheets,
+       modals) off the page without producing a grey smear on navy. */
+    --elev-1: none;
+    --elev-2: 0 4px 10px -4px rgb(0 0 0 / 0.5);
+    --elev-3: 0 12px 28px -8px rgb(0 0 0 / 0.65);
   }
 
   /* Hanken Grotesk carries body/UI copy for legibility; Familjen Grotesk is the
@@ -66,6 +90,20 @@
     font-family: 'Familjen Grotesk', 'Hanken Grotesk', system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
+  }
+}
+
+/* Respect the OS "reduce motion" setting. The app's motion is decorative
+   (fades, ring fills, progress-bar transitions) — none of it conveys
+   information that is lost when it is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

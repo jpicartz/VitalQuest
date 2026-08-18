@@ -92,6 +92,13 @@ export function clientKey(req: VercelRequest): string {
 // image blocks with a URL source, which would let a caller make Anthropic fetch
 // arbitrary URLs on this key (and bill at image rates), so restrict content to
 // plain text.
+//
+// This is permanent, not a placeholder. Photo meal-logging was considered and
+// deliberately cut: the accuracy needed to put a calorie number on a plate from
+// a picture is not there, and a confidently wrong number in a health app is
+// worse than no feature. Nothing in the product needs image content, so any
+// future change that relaxes this is a security regression with no user-facing
+// justification -- treat it as such.
 export function messagesAreTextOnly(messages: unknown[]): boolean {
   return messages.every((m) => {
     if (typeof m !== 'object' || m === null) return false;

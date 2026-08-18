@@ -14,7 +14,7 @@ const steps = [
   'Medical'
 ];
 
-const inputClass = "w-full p-4 rounded-control bg-card border-2 border-edge text-fg placeholder:text-fg-mute focus:border-nutri focus:outline-none text-lg";
+const inputClass = "w-full p-4 rounded-control bg-card border-2 border-edge text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-page text-lg";
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading }) => {
   const [step, setStep] = useState(0);
@@ -106,7 +106,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
   };
 
   const unitBtn = (active: boolean) =>
-    `px-3 py-1 text-xs font-bold rounded-md transition-all ${active ? 'bg-card shadow-sm dark:shadow-none text-fg' : 'text-fg-mute'}`;
+    `px-3 py-1 text-xs font-bold rounded-md transition-all ${active ? 'bg-card shadow-e1 text-fg' : 'text-fg-mute'}`;
 
   const renderStep = () => {
     switch (step) {

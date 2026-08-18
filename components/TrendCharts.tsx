@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from './ui/Card';
 import {
   BarChart,
   Bar,
@@ -64,9 +65,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({
 
   return (
     <div className="space-y-6">
-      <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-        <h3 className="text-lg font-bold text-fg mb-1">{rangeLabel} Calories</h3>
-        <p className="text-xs text-fg-mute mb-4">Daily intake vs your TDEE target</p>
+      <Card title={`${rangeLabel} Calories`} description="Daily intake vs your TDEE target">
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={dailySummaries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -85,11 +84,9 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({
             <Bar dataKey="calories" fill="#22c55e" radius={[6, 6, 0, 0]} name="Calories" />
           </BarChart>
         </ResponsiveContainer>
-      </section>
+      </Card>
 
-      <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-        <h3 className="text-lg font-bold text-fg mb-1">{rangeLabel} Protein</h3>
-        <p className="text-xs text-fg-mute mb-4">Grams per day vs target</p>
+      <Card title={`${rangeLabel} Protein`} description="Grams per day vs target">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={dailySummaries} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
@@ -115,10 +112,9 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({
             />
           </LineChart>
         </ResponsiveContainer>
-      </section>
+      </Card>
 
-      <section className="bg-card p-6 rounded-card border border-edge shadow-sm dark:shadow-none">
-        <h3 className="text-lg font-bold text-fg mb-1">Macro Breakdown</h3>
+      <Card title="Macro Breakdown">
         <p className="text-xs text-fg-mute mb-4">{rangeLabel} calories from protein, carbs, and fat</p>
         {macroPieData.length > 0 ? (
           <div className="flex flex-col md:flex-row items-center gap-6">
@@ -172,7 +168,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({
         ) : (
           <p className="text-fg-mute text-sm text-center py-8">No macro data yet.</p>
         )}
-      </section>
+      </Card>
     </div>
   );
 };

@@ -9,10 +9,19 @@ export const PRIORITY_MICROS = [
 ] as const;
 
 /**
- * Compute the Micronutrient Score (0–100) for a set of food logs.
- * If `dateISO` is provided, only logs for that calendar day are included.
+ * Total micronutrient intake across a set of logs, keyed by canonical nutrient
+ * name. Optionally filtered to a single calendar day.
+ *
+ * This is the SINGLE aggregation path. Every surface that shows a micronutrient
+ * number must go through it — the score, the snapshot, the breakdown grid and
+ * the body-system scores. Previously `NutritionTracker` maintained its own copy
+ * of this loop with a weaker coercion, so the page could show `NaN% DV` in the
+ * tiles directly beneath a correct score.
  */
-export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => {
+export const computeConsumedMicros = (
+  logs: MealLog[],
+  dateISO?: string
+): Record<string, number> => {
   const relevant = dateISO
     ? logs.filter(l => l.timestamp && isSameISODate(l.timestamp, dateISO))
     : logs;
@@ -22,12 +31,25 @@ export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => 
     if (log.food.micros) {
       Object.entries(log.food.micros).forEach(([key, val]) => {
         // `Number(val) || 0`, NOT `Number(val || 0)`. The AI sometimes returns
-        // "28g" instead of 28; the latter form yields NaN, which propagates
-        // through the whole score and renders as NaN in the score ring.
+        // "28g" instead of 28; the latter form yields NaN, which then poisons
+        // every total it is added to.
         consumed[key] = (consumed[key] || 0) + (Number(val) || 0);
       });
     }
   });
+  return consumed;
+};
+
+/**
+ * Compute the Micronutrient Score (0–100) for a set of food logs.
+ * If `dateISO` is provided, only logs for that calendar day are included.
+ *
+ * Kept as the canonical aggregate even after body-system scores land: it is the
+ * input to the `nutrition-nerd` badge, and body systems are a presentation
+ * layer over the same consumed map rather than a replacement for it.
+ */
+export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => {
+  const consumed = computeConsumedMicros(logs, dateISO);
 
   let totalRatio = 0;
   let count = 0;

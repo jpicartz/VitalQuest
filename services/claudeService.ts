@@ -1,5 +1,6 @@
 import { UserProfile, WellnessPlan, FoodItem, MealSuggestion, MacroTargets, NutritionInsight } from "../types";
 import type { InsightsPayload } from "../utils/nutritionAggregates";
+import { COACH_SYSTEM_RULES } from "../utils/coachSafety";
 
 // Full-reasoning model for plan generation and weekly insights
 const MODEL = 'claude-sonnet-4-5';
@@ -12,7 +13,19 @@ const CLAUDE_URL = import.meta.env.DEV
   ? 'https://api.anthropic.com/v1/messages'
   : '/api/claude';
 
-const callClaude = async (system: string, userMsg: string, maxTokens = 1500, model = MODEL): Promise<string> => {
+type ChatTurn = { role: 'user' | 'assistant'; content: string };
+
+/**
+ * `userMsg` may be a single string (the common case) or a full turn array for
+ * multi-turn conversation. The proxy already accepts `role: 'assistant'`, so
+ * multi-turn needs no server change.
+ */
+const callClaude = async (
+  system: string,
+  userMsg: string | ChatTurn[],
+  maxTokens = 1500,
+  model = MODEL
+): Promise<string> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'anthropic-version': '2023-06-01',
@@ -31,7 +44,7 @@ const callClaude = async (system: string, userMsg: string, maxTokens = 1500, mod
       model,
       max_tokens: maxTokens,
       system,
-      messages: [{ role: 'user', content: userMsg }],
+      messages: Array.isArray(userMsg) ? userMsg : [{ role: 'user', content: userMsg }],
     }),
   });
 
@@ -202,27 +215,93 @@ export const normalizeMicros = (raw: Record<string, unknown>): FoodItem['micros'
   return result;
 };
 
+/** Shape the model returns: nutrition for ONE unit, plus how many units. */
+interface ParsedFood {
+  name?: unknown;
+  unit?: unknown;
+  quantity?: unknown;
+  perUnit?: {
+    calories?: unknown; protein?: unknown; carbs?: unknown; fat?: unknown;
+    micros?: Record<string, unknown>;
+  };
+  // Legacy/fallback: a model that ignores the schema and returns totals directly.
+  servingSize?: unknown;
+  calories?: unknown; protein?: unknown; carbs?: unknown; fat?: unknown;
+  micros?: Record<string, unknown>;
+}
+
+/**
+ * Turn one parsed food into a totalled FoodItem.
+ *
+ * The multiplication happens HERE, in code, not in the prompt. Asking the model
+ * to scale was unreliable in both directions: left to itself it returned
+ * per-100g USDA figures while labelling the serving "5 eggs" (a 2.5x
+ * under-count), and instructing it to multiply produced a 4x over-count.
+ * Per-unit values are something a nutrition database genuinely knows; the
+ * arithmetic is something JavaScript should do.
+ */
+export const scaleParsedFood = (f: ParsedFood, id: string): FoodItem => {
+  const per = f.perUnit;
+  const rawQty = Number(f.quantity);
+  const quantity = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+
+  // If the model returned the legacy totals shape, treat it as quantity 1.
+  const source = per ?? f;
+  const multiplier = per ? quantity : 1;
+
+  const scale = (v: unknown) => {
+    const n = Number(v) || 0;
+    // 2dp keeps trace micronutrients meaningful without float noise.
+    return Math.round(n * multiplier * 100) / 100;
+  };
+
+  const baseMicros = normalizeMicros((source.micros as Record<string, unknown>) || {});
+  const micros: FoodItem['micros'] = {};
+  for (const [k, v] of Object.entries(baseMicros)) {
+    micros[k] = Math.round(v * multiplier * 100) / 100;
+  }
+
+  const unitLabel = f.unit ? String(f.unit) : String(f.servingSize || '1 serving');
+
+  return {
+    id,
+    name: String(f.name ?? 'Food'),
+    servingSize: per && quantity !== 1 ? `${quantity} × ${unitLabel}` : unitLabel,
+    calories: scale(source.calories),
+    protein: scale(source.protein),
+    carbs: scale(source.carbs),
+    fat: scale(source.fat),
+    micros,
+  };
+};
+
 export const parseFoodLog = async (input: string): Promise<FoodItem[]> => {
-  const prompt = `Parse this food description using USDA values. Input: "${input}"
+  const prompt = `Identify each food in this description and report its nutrition PER SINGLE UNIT, plus how many units the user had. Do NOT multiply — the app does that.
+
+Input: "${input}"
+
+For each food:
+- "unit": the natural single unit and its weight, e.g. "1 large egg (50g)", "1 slice (28g)", "100g"
+- "quantity": how many of that unit the user described (a number; 1 if unstated)
+- "perUnit": nutrition for ONE unit only, from USDA reference data
+
 Return ONLY JSON using EXACTLY these micro key names:
-{"foods":[{"name":"...","servingSize":"...","calories":0,"protein":0,"carbs":0,"fat":0,"micros":{"Fiber":0,"Sugar":0,"Vitamin A":0,"Vitamin C":0,"Vitamin D":0,"Vitamin E":0,"Vitamin K":0,"Thiamin":0,"Riboflavin":0,"Niacin":0,"Vitamin B6":0,"Folate":0,"Vitamin B12":0,"Biotin":0,"Pantothenic Acid":0,"Choline":0,"Calcium":0,"Iron":0,"Magnesium":0,"Phosphorus":0,"Potassium":0,"Sodium":0,"Zinc":0,"Copper":0,"Manganese":0,"Selenium":0,"Iodine":0,"Omega-3":0}}]}
-Use 0 for unknown values. All numbers, no strings in micros.`;
+{"foods":[{"name":"...","unit":"...","quantity":1,"perUnit":{"calories":0,"protein":0,"carbs":0,"fat":0,"micros":{"Fiber":0,"Sugar":0,"Vitamin A":0,"Vitamin C":0,"Vitamin D":0,"Vitamin E":0,"Vitamin K":0,"Thiamin":0,"Riboflavin":0,"Niacin":0,"Vitamin B6":0,"Folate":0,"Vitamin B12":0,"Biotin":0,"Pantothenic Acid":0,"Choline":0,"Calcium":0,"Iron":0,"Magnesium":0,"Phosphorus":0,"Potassium":0,"Sodium":0,"Zinc":0,"Copper":0,"Manganese":0,"Selenium":0,"Iodine":0,"Omega-3":0}}}]}
+Units: Vitamin A/D/K/Folate/B12/Biotin/Selenium/Iodine in mcg; other vitamins and minerals in mg; Omega-3 in g. Estimate from USDA rather than returning 0 where a reasonable value exists. All numbers, no strings.`;
 
   // NOTE: this deliberately throws rather than returning [] — the caller needs
   // to distinguish "no food found" from "the request failed" so it can tell the
   // user instead of silently closing the form.
-  const raw = await callClaude('Precise nutrition database. Return only JSON.', prompt, 2500, MODEL_FAST);
+  const raw = await callClaude(
+    'Precise nutrition database. Report per-unit values only; never multiply. Return only JSON.',
+    prompt,
+    2500,
+    MODEL_FAST
+  );
   const data = parseJsonResponse(raw);
-  return (data.foods || []).map((f: Record<string, unknown>, i: number) => ({
-    id: `claude-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}`,
-    name: String(f.name),
-    servingSize: String(f.servingSize || '1 serving'),
-    calories: Number(f.calories) || 0,
-    protein: Number(f.protein) || 0,
-    carbs: Number(f.carbs) || 0,
-    fat: Number(f.fat) || 0,
-    micros: normalizeMicros((f.micros as Record<string, unknown>) || {}),
-  }));
+  return (data.foods || []).map((f: ParsedFood, i: number) =>
+    scaleParsedFood(f, `claude-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}`)
+  );
 };
 
 export const suggestMeals = async (
@@ -323,4 +402,72 @@ Return ONLY JSON: {"headline":"...","patterns":["..."],"insights":["..."],"recom
       encouragement: 'Small consistent logs beat perfect sporadic ones.',
     };
   }
+};
+
+// ── Coach ──────────────────────────────────────────────────────────────────
+
+export interface CoachTurn { role: 'user' | 'assistant'; content: string }
+
+export interface CoachContext {
+  profile: UserProfile;
+  /** Body-system scores, already computed. */
+  systems: { label: string; score: number; gaps: string[] }[];
+  /** What the conversation is anchored to, e.g. "Skin". */
+  subject?: string;
+  planFocus?: string;
+  dailyCalorieTarget?: number;
+}
+
+/** Keep well under MAX_SYSTEM_CHARS (4000) once the rules are prepended. */
+const MAX_CONTEXT_CHARS = 1200;
+
+/**
+ * Assemble the per-user context block. Exported so its size can be asserted in
+ * tests — dev bypasses the proxy entirely, so an oversized prompt would 413
+ * only in production.
+ */
+export const buildCoachContext = (ctx: CoachContext): string => {
+  const { profile, systems, subject, planFocus, dailyCalorieTarget } = ctx;
+  const conditions = profile.medicationsOrConditions?.trim();
+
+  const lines = [
+    `User: ${profile.age}yo ${profile.gender}, goal ${profile.goal}.`,
+    profile.dietaryRestrictions?.length
+      ? `Dietary restrictions: ${profile.dietaryRestrictions.join(', ')}.`
+      : '',
+    conditions && !/^none$/i.test(conditions)
+      ? `SAFETY CRITICAL — reported conditions/medications: ${conditions}. Screen every suggestion against these.`
+      : '',
+    dailyCalorieTarget ? `Daily calorie target: ${dailyCalorieTarget} kcal.` : '',
+    planFocus ? `Plan focus: ${planFocus}` : '',
+    systems.length
+      ? `Today's nutrient support scores: ${systems
+          .map((s) => `${s.label} ${s.score}%${s.gaps.length ? ` (short on ${s.gaps.slice(0, 3).join(', ')})` : ''}`)
+          .join('; ')}.`
+      : 'No food logged today.',
+    subject ? `The user opened this conversation from their ${subject} score, so answer about that unless they ask otherwise.` : '',
+  ].filter(Boolean);
+
+  const out = lines.join('\n');
+  return out.length > MAX_CONTEXT_CHARS ? `${out.slice(0, MAX_CONTEXT_CHARS)}…` : out;
+};
+
+/**
+ * Ask the coach.
+ *
+ * NOTE: unlike suggestMeals and generateNutritionInsights, this deliberately
+ * does NOT fall back to canned content on failure. Those return generic text
+ * when the API is unreachable, which is fine for a meal idea and unacceptable
+ * for a conversational health surface — canned content must never appear to
+ * answer a restriction-seeking question. On error this throws and the UI says
+ * the coach is unavailable.
+ */
+export const askCoach = async (
+  history: CoachTurn[],
+  ctx: CoachContext
+): Promise<string> => {
+  const system = `${COACH_SYSTEM_RULES}\n\n--- The user's data ---\n${buildCoachContext(ctx)}`;
+  // Keep the last few turns only: enough for follow-ups, bounded for cost.
+  const turns = history.slice(-8);
+  return callClaude(system, turns, 700, MODEL_FAST);
 };

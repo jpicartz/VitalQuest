@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP } from './claudeService';
+import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood } from './claudeService';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { PRIORITY_MICROS } from '../utils/nutritionAggregates';
 
@@ -135,6 +135,106 @@ describe('normalizeMicros', () => {
 
   it('returns an empty object for empty input', () => {
     expect(normalizeMicros({})).toEqual({});
+  });
+});
+
+describe('scaleParsedFood', () => {
+  // The bug this exists to prevent: the model was returning per-100g USDA
+  // figures while labelling the serving "5 eggs (250g)", so five eggs logged as
+  // 155 kcal and 27.5 mcg biotin instead of ~390 kcal and ~50 mcg. Telling the
+  // model to multiply instead produced a 4x OVER-count. The arithmetic belongs
+  // in code.
+  const egg = {
+    name: 'Egg',
+    unit: '1 large egg (50g)',
+    quantity: 5,
+    perUnit: {
+      calories: 78, protein: 6.3, carbs: 0.6, fat: 5.3,
+      micros: { Biotin: 10, Choline: 147, Selenium: 15.4 },
+    },
+  };
+
+  it('multiplies every field by quantity', () => {
+    const f = scaleParsedFood(egg, 'id-1');
+    expect(f.calories).toBe(390);
+    expect(f.protein).toBe(31.5);
+    expect(f.fat).toBe(26.5);
+  });
+
+  it('multiplies micronutrients too, not just macros', () => {
+    const f = scaleParsedFood(egg, 'id-1');
+    expect(f.micros!.Biotin).toBe(50);      // 10 x 5 — now exceeds the 30 target
+    expect(f.micros!.Choline).toBe(735);
+  });
+
+  it('labels the serving with the quantity', () => {
+    expect(scaleParsedFood(egg, 'id-1').servingSize).toBe('5 × 1 large egg (50g)');
+  });
+
+  it('does not prefix the label when quantity is 1', () => {
+    const f = scaleParsedFood({ ...egg, quantity: 1 }, 'id-1');
+    expect(f.servingSize).toBe('1 large egg (50g)');
+    expect(f.calories).toBe(78);
+  });
+
+  it('handles fractional quantities', () => {
+    const f = scaleParsedFood({ ...egg, quantity: 0.5 }, 'id-1');
+    expect(f.calories).toBe(39);
+    expect(f.micros!.Biotin).toBe(5);
+  });
+
+  it.each([undefined, null, 0, -3, 'abc', NaN])(
+    'falls back to quantity 1 for %o', (q) => {
+      const f = scaleParsedFood({ ...egg, quantity: q as never }, 'id-1');
+      expect(f.calories).toBe(78);
+      expect(Number.isNaN(f.calories)).toBe(false);
+    }
+  );
+
+  it('normalises micro key aliases before scaling', () => {
+    const f = scaleParsedFood({
+      name: 'Test', unit: '1 serving', quantity: 2,
+      perUnit: { calories: 10, micros: { vitamin_c: 45, 'omega 3': 0.4 } },
+    }, 'id-1');
+    expect(f.micros!['Vitamin C']).toBe(90);
+    expect(f.micros!['Omega-3']).toBe(0.8);
+  });
+
+  it('coerces unparseable values to 0 rather than NaN', () => {
+    const f = scaleParsedFood({
+      name: 'Test', unit: '1 serving', quantity: 3,
+      perUnit: { calories: '78 kcal', protein: null, micros: { Biotin: '10mcg' } },
+    } as never, 'id-1');
+    expect(f.calories).toBe(0);
+    expect(f.protein).toBe(0);
+    expect(f.micros!.Biotin).toBe(0);
+    expect(Number.isNaN(f.calories)).toBe(false);
+  });
+
+  it('accepts the legacy totals shape without double-scaling', () => {
+    // A model that ignores the per-unit schema and returns totals directly must
+    // not then be multiplied again.
+    const f = scaleParsedFood({
+      name: 'Egg', servingSize: '5 eggs', quantity: 5,
+      calories: 390, protein: 31.5, micros: { Biotin: 50 },
+    } as never, 'id-1');
+    expect(f.calories).toBe(390);
+    expect(f.micros!.Biotin).toBe(50);
+    expect(f.servingSize).toBe('5 eggs');
+  });
+
+  it('survives a food with no micros at all', () => {
+    const f = scaleParsedFood({ name: 'Water', unit: '1 glass', quantity: 2, perUnit: { calories: 0 } }, 'id-1');
+    expect(f.calories).toBe(0);
+    expect(f.micros).toEqual({});
+  });
+
+  it('rounds to 2dp so trace nutrients survive without float noise', () => {
+    const f = scaleParsedFood({
+      name: 'Test', unit: '1 serving', quantity: 3,
+      perUnit: { calories: 0, micros: { Iodine: 0.1 } },
+    }, 'id-1');
+    expect(f.micros!.Iodine).toBe(0.3);
   });
 });
 
