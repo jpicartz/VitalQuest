@@ -1,8 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import {
-  CalculatedMetrics, GamificationState, UserProfile, WellnessPlan,
-  MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry, StoredWeightGoal,
-} from '../types';
+import React, { useState } from 'react';
+import { GamificationState } from '../types';
 import { PlanDisplay } from './PlanDisplay';
 import { Button } from './ui/Button';
 import { NutritionTracker } from './NutritionTracker';
@@ -17,45 +14,19 @@ import { AchievementsPanel } from './panels/AchievementsPanel';
 import { StatsPanel } from './panels/StatsPanel';
 import { CoachTabPanel } from './panels/CoachTabPanel';
 import { SegmentedControl } from './ui/SegmentedControl';
-import { computeConsumedMicros } from '../utils/nutritionAggregates';
+import { useProfile } from '../contexts/ProfileContext';
+import { useLogs } from '../contexts/LogsContext';
 import {
   IconFlame, IconApple, IconBowl, IconHeartbeat, IconTargetArrow,
   IconMessageCircle, IconUserCircle, IconX,
 } from '@tabler/icons-react';
 
 interface DashboardProps {
-  profile: UserProfile;
-  metrics: CalculatedMetrics;
-  plan: WellnessPlan;
+  // Gamification stays prop-drilled on purpose: two readers, and a context for
+  // it would be abstraction without a problem to solve.
   gamification: GamificationState;
   onUpdateGamification: (newState: GamificationState, questsCompletedDelta?: number) => void;
   onReset: () => void;
-  foodLogs: MealLog[];
-  onAddFood: (meal: MealType, food: FoodItem) => void;
-  onUpdateLog: (log: MealLog) => void;
-  onDeleteLog: (logId: string) => void;
-  onResetTodayLog: () => void;
-  selectedDate: string;
-  onSelectDate: (date: string) => void;
-  allFoodLogs: MealLog[];
-  // Water
-  waterLog: WaterLog;
-  onLogWater: (ml: number) => void;
-  onResetWater: () => void;
-  // Weight
-  weightHistory: WeightEntry[];
-  onLogWeight: (kg: number) => void;
-  weightGoal: StoredWeightGoal | null;
-  onSetWeightGoal: (goal: StoredWeightGoal | null) => void;
-  // Favourites
-  favouriteFoods: FoodItem[];
-  onAddFavourite: (food: FoodItem) => void;
-  onRemoveFavourite: (foodId: string) => void;
-  onQuickAddFavourite: (food: FoodItem, mealType: MealType) => void;
-  // Exercise
-  exerciseLogs: ExerciseEntry[];
-  onLogExercise: (type: string, durationMin: number, notes?: string) => void;
-  onDeleteExercise: (id: string) => void;
 }
 
 export type TabId = 'today' | 'body' | 'goal' | 'coach';
@@ -69,35 +40,13 @@ const TABS: { id: TabId; label: string; Icon: typeof IconBowl }[] = [
 ];
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  profile,
-  metrics,
-  plan,
   gamification,
   onUpdateGamification,
   onReset,
-  foodLogs,
-  onAddFood,
-  onUpdateLog,
-  selectedDate,
-  onSelectDate,
-  allFoodLogs,
-  onDeleteLog,
-  onResetTodayLog,
-  waterLog,
-  onLogWater,
-  onResetWater,
-  weightHistory,
-  onLogWeight,
-  weightGoal,
-  onSetWeightGoal,
-  favouriteFoods,
-  onAddFavourite,
-  onRemoveFavourite,
-  onQuickAddFavourite,
-  exerciseLogs,
-  onLogExercise,
-  onDeleteExercise,
 }) => {
+  const { metrics, plan } = useProfile();
+  // The shell needs only today's calorie total; every panel reads its own data.
+  const { foodLogs } = useLogs();
   const [activeTab, setActiveTab] = useState<TabId>('today');
   const [showProfile, setShowProfile] = useState(false);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
@@ -115,14 +64,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onUpdateGamification(newState, 1);
   };
 
-  // Today's intake, for the Coach tab. Same single aggregation path the
-  // Body tab uses, so the coach can never quote a different number.
-  const coachMicros = useMemo(() => computeConsumedMicros(foodLogs), [foodLogs]);
-  const coachMacros = useMemo(() => foodLogs.reduce((a, l) => ({
-    protein: a.protein + (Number(l.food.protein) || 0),
-    carbs:   a.carbs   + (Number(l.food.carbs)   || 0),
-    fat:     a.fat     + (Number(l.food.fat)     || 0),
-  }), { protein: 0, carbs: 0, fat: 0 }), [foodLogs]);
 
   // The plan comes from the AI, so never assume its arrays are present.
   const dailyQuests = plan.dailyQuests ?? [];
@@ -221,111 +162,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ── Today: log what I ate ── */}
       {activeTab === 'today' && (
-        <NutritionTracker
-          view="log"
-          logs={foodLogs}
-          onAddFood={onAddFood}
-          onUpdateLog={onUpdateLog}
-          onDeleteLog={onDeleteLog}
-          selectedDate={selectedDate}
-          onSelectDate={onSelectDate}
-          allFoodLogs={allFoodLogs}
-          targets={{ calories: metrics.tdee, ...metrics.macros }}
-          profile={profile}
-          plan={plan}
-          onResetTodayLog={onResetTodayLog}
-          waterLog={waterLog}
-          onLogWater={onLogWater}
-          onResetWater={onResetWater}
-          weightHistory={weightHistory}
-          favouriteFoods={favouriteFoods}
-          onAddFavourite={onAddFavourite}
-          onRemoveFavourite={onRemoveFavourite}
-          onQuickAddFavourite={onQuickAddFavourite}
-        />
+        <NutritionTracker view="log" />
       )}
 
       {/* ── Body: understand what it did ── */}
       {activeTab === 'body' && (
-        <NutritionTracker
-          view="analysis"
-          logs={foodLogs}
-          onAddFood={onAddFood}
-          onUpdateLog={onUpdateLog}
-          onDeleteLog={onDeleteLog}
-          selectedDate={selectedDate}
-          onSelectDate={onSelectDate}
-          allFoodLogs={allFoodLogs}
-          targets={{ calories: metrics.tdee, ...metrics.macros }}
-          profile={profile}
-          plan={plan}
-          onResetTodayLog={onResetTodayLog}
-          waterLog={waterLog}
-          onLogWater={onLogWater}
-          onResetWater={onResetWater}
-          weightHistory={weightHistory}
-          favouriteFoods={favouriteFoods}
-          onAddFavourite={onAddFavourite}
-          onRemoveFavourite={onRemoveFavourite}
-          onQuickAddFavourite={onQuickAddFavourite}
-        />
+        <NutritionTracker view="analysis" />
       )}
 
       {/* ── Goal: where I'm heading and what to do now ── */}
       {activeTab === 'goal' && (
         <div className="space-y-5 animate-fade-in">
           {/* All safety refusals live in goalProjection, not in a prompt. */}
-          <GoalPanel
-            profile={profile}
-            weightHistory={weightHistory}
-            goal={weightGoal}
-            onSetGoal={onSetWeightGoal}
-          />
+          <GoalPanel />
 
           {/* Quests are today's actions toward the goal, not free-floating
               gamification — which is why they live here rather than in a tab. */}
           <QuestList dailyQuests={dailyQuests} gamification={gamification} completeQuest={completeQuest} />
 
-          <WeightPanel profile={profile} weightHistory={weightHistory} onLogWeight={onLogWeight} />
+          <WeightPanel />
 
-          <ExercisePanel exerciseLogs={exerciseLogs} onLogExercise={onLogExercise} onDeleteExercise={onDeleteExercise} />
+          <ExercisePanel />
 
           {/* Trend charts + AI weekly insights (was the Trends sub-tab). */}
-        <NutritionTracker
-          view="trends"
-          logs={foodLogs}
-          onAddFood={onAddFood}
-          onUpdateLog={onUpdateLog}
-          onDeleteLog={onDeleteLog}
-          selectedDate={selectedDate}
-          onSelectDate={onSelectDate}
-          allFoodLogs={allFoodLogs}
-          targets={{ calories: metrics.tdee, ...metrics.macros }}
-          profile={profile}
-          plan={plan}
-          onResetTodayLog={onResetTodayLog}
-          waterLog={waterLog}
-          onLogWater={onLogWater}
-          onResetWater={onResetWater}
-          weightHistory={weightHistory}
-          favouriteFoods={favouriteFoods}
-          onAddFavourite={onAddFavourite}
-          onRemoveFavourite={onRemoveFavourite}
-          onQuickAddFavourite={onQuickAddFavourite}
-        />
+        <NutritionTracker view="trends" />
         </div>
       )}
 
       {/* ── Coach: ask why ── */}
       {activeTab === 'coach' && (
         <div className="animate-fade-in">
-          <CoachTabPanel
-            profile={profile}
-            consumedMicros={coachMicros}
-            consumedMacros={coachMacros}
-            targets={{ calories: metrics.tdee, ...metrics.macros }}
-            planFocus={plan.nutritionFocus}
-          />
+          <CoachTabPanel />
         </div>
       )}
 

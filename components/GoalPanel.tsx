@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useProfile } from '../contexts/ProfileContext';
+import { useLogs, useLogActions } from '../contexts/LogsContext';
 import { Card } from './ui/Card';
 import { UserProfile, WeightEntry, StoredWeightGoal } from '../types';
 import { projectGoal } from '../utils/goalProjection';
@@ -9,12 +11,6 @@ import {
   IconCheck, IconPencil,
 } from '@tabler/icons-react';
 
-interface GoalPanelProps {
-  profile: UserProfile;
-  weightHistory: WeightEntry[];
-  goal: StoredWeightGoal | null;
-  onSetGoal: (goal: StoredWeightGoal | null) => void;
-}
 
 const fmtDate = (iso: string) =>
   parseISODate(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -27,7 +23,10 @@ const fmtDate = (iso: string) =>
  * shown in place of a plan and (where one exists) a safe alternative is offered
  * as a single tap. The UI never works around a refusal.
  */
-export const GoalPanel: React.FC<GoalPanelProps> = ({ profile, weightHistory, goal, onSetGoal }) => {
+export const GoalPanel: React.FC = () => {
+  const { profile } = useProfile();
+  const { weightHistory, weightGoal: goal } = useLogs();
+  const { onSetWeightGoal: onSetGoal } = useLogActions();
   const currentKg = weightHistory.length
     ? [...weightHistory].sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0].kg
     : profile.weightKg;

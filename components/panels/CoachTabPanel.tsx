@@ -1,18 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useProfile } from '../../contexts/ProfileContext';
+import { useLogs } from '../../contexts/LogsContext';
+import { computeConsumedMicros } from '../../utils/nutritionAggregates';
 import { Card } from '../ui/Card';
 import { UserProfile, MacroTargets } from '../../types';
-import { BodySystemScore, ConsumedMacros, computeBodySystems, supportBand } from '../../utils/bodySystems';
+import { BodySystemScore, computeBodySystems } from '../../utils/bodySystems';
 import { Coach } from '../Coach';
 import { Button } from '../ui/Button';
 import { IconMessageCircle, IconSparkles } from '@tabler/icons-react';
 
-interface CoachTabPanelProps {
-  profile: UserProfile;
-  consumedMicros: Record<string, number>;
-  consumedMacros: ConsumedMacros;
-  targets: MacroTargets;
-  planFocus?: string;
-}
 
 /**
  * The Coach tab.
@@ -22,9 +18,19 @@ interface CoachTabPanelProps {
  * into an empty chat. A blank box is both a worse experience — nobody knows
  * what to type — and a wider safety surface than a scoped conversation.
  */
-export const CoachTabPanel: React.FC<CoachTabPanelProps> = ({
-  profile, consumedMicros, consumedMacros, targets, planFocus,
-}) => {
+export const CoachTabPanel: React.FC = () => {
+  const { profile, plan, targets } = useProfile();
+  const { foodLogs } = useLogs();
+  const planFocus = plan.nutritionFocus;
+
+  // Derived here rather than handed down: Dashboard was computing these purely
+  // to pass along, which made it re-render on every log change for no reason.
+  const consumedMicros = useMemo(() => computeConsumedMicros(foodLogs), [foodLogs]);
+  const consumedMacros = useMemo(() => foodLogs.reduce((a, l) => ({
+    protein: a.protein + (Number(l.food.protein) || 0),
+    carbs:   a.carbs   + (Number(l.food.carbs)   || 0),
+    fat:     a.fat     + (Number(l.food.fat)     || 0),
+  }), { protein: 0, carbs: 0, fat: 0 }), [foodLogs]);
   const [open, setOpen] = useState<BodySystemScore | null>(null);
   const [general, setGeneral] = useState(false);
 

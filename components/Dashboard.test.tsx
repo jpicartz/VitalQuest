@@ -1,11 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dashboard } from './Dashboard';
-import {
-  aProfile, aMetrics, aPlan, aGamification, aMealLog, aFood,
-  aWaterLog, aWeightEntry, anExercise, TODAY,
-} from '../test/fixtures';
+import { aGamification, aMealLog, aFood, aWeightEntry, anExercise } from '../test/fixtures';
+import { renderWithApp, AppOverrides } from '../test/renderWithApp';
 
 /**
  * Smoke tests for the v2 information architecture: four destinations —
@@ -17,41 +15,31 @@ import {
  * what catches it.
  */
 
-type Props = Parameters<typeof Dashboard>[0];
+/**
+ * Props now go through the providers, not the component. The helper takes the
+ * same flat object it always did, so every assertion below is untouched by the
+ * context extraction -- which is the point: these tests are the evidence that
+ * the refactor changed nothing a user can see.
+ */
+type Over = AppOverrides & {
+  gamification?: Parameters<typeof Dashboard>[0]['gamification'];
+  onUpdateGamification?: Parameters<typeof Dashboard>[0]['onUpdateGamification'];
+  onReset?: Parameters<typeof Dashboard>[0]['onReset'];
+};
 
-const renderDashboard = (over: Partial<Props> = {}) => {
-  const props: Props = {
-    profile: aProfile(),
-    metrics: aMetrics(),
-    plan: aPlan(),
-    gamification: aGamification(),
-    onUpdateGamification: vi.fn(),
-    onReset: vi.fn(),
-    foodLogs: [],
-    onAddFood: vi.fn(),
-    onUpdateLog: vi.fn(),
-    onDeleteLog: vi.fn(),
-    onResetTodayLog: vi.fn(),
-    selectedDate: TODAY,
-    onSelectDate: vi.fn(),
-    allFoodLogs: [],
-    waterLog: aWaterLog(),
-    onLogWater: vi.fn(),
-    onResetWater: vi.fn(),
-    weightHistory: [aWeightEntry({ kg: 76, isBaseline: true })],
-    onLogWeight: vi.fn(),
-    weightGoal: null,
-    onSetWeightGoal: vi.fn(),
-    favouriteFoods: [],
-    onAddFavourite: vi.fn(),
-    onRemoveFavourite: vi.fn(),
-    onQuickAddFavourite: vi.fn(),
-    exerciseLogs: [],
-    onLogExercise: vi.fn(),
-    onDeleteExercise: vi.fn(),
-    ...over,
+const renderDashboard = (over: Over = {}) => {
+  const { gamification, onUpdateGamification, onReset, ...ctx } = over;
+  return {
+    user: userEvent.setup(),
+    ...renderWithApp(
+      <Dashboard
+        gamification={gamification ?? aGamification()}
+        onUpdateGamification={onUpdateGamification ?? vi.fn()}
+        onReset={onReset ?? vi.fn()}
+      />,
+      { weightHistory: [aWeightEntry({ kg: 76, isBaseline: true })], ...ctx },
+    ),
   };
-  return { props, user: userEvent.setup(), ...render(<Dashboard {...props} />) };
 };
 
 const tab = (name: RegExp) => screen.getByRole('tab', { name });

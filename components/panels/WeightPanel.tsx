@@ -1,21 +1,21 @@
 import React, { useState, useMemo } from 'react';
+import { useProfile } from '../../contexts/ProfileContext';
+import { useLogs, useLogActions } from '../../contexts/LogsContext';
 import { Card } from '../ui/Card';
 import { Field } from '../ui/Field';
 import { UserProfile, WeightEntry } from '../../types';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { Button } from '../ui/Button';
 
-interface WeightPanelProps {
-  profile: UserProfile;
-  weightHistory: WeightEntry[];
-  onLogWeight: (kg: number) => void;
-}
 
 /**
  * Extracted verbatim from Dashboard, along with the derived values and local
  * input state it owns — they were only in Dashboard because this block was.
  */
-export const WeightPanel: React.FC<WeightPanelProps> = ({ profile, weightHistory, onLogWeight }) => {
+export const WeightPanel: React.FC = () => {
+  const { profile } = useProfile();
+  const { weightHistory } = useLogs();
+  const { onLogWeight } = useLogActions();
   const [weightInput, setWeightInput] = useState('');
 
   // Last 14 entries.

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
+import { useLogs, useLogActions } from '../../contexts/LogsContext';
 import { Card } from '../ui/Card';
 import { Field } from '../ui/Field';
-import { ExerciseEntry } from '../../types';
 import { toISODateString } from '../../utils/dateUtils';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -10,20 +10,15 @@ import {
   IconBarbell, IconYoga, IconBolt, IconStretching,
 } from '@tabler/icons-react';
 
-interface ExercisePanelProps {
-  exerciseLogs: ExerciseEntry[];
-  onLogExercise: (type: string, durationMin: number, notes?: string) => void;
-  onDeleteExercise: (id: string) => void;
-}
 
 /**
  * Extracted verbatim from Dashboard. The log modal travels WITH the panel and
  * owns the state that drives it — separating a component from its modal is
  * exactly how modals get orphaned during a restructure.
  */
-export const ExercisePanel: React.FC<ExercisePanelProps> = ({
-  exerciseLogs, onLogExercise, onDeleteExercise,
-}) => {
+export const ExercisePanel: React.FC = () => {
+  const { exerciseLogs } = useLogs();
+  const { onLogExercise, onDeleteExercise } = useLogActions();
   const [isLoggingExercise, setIsLoggingExercise] = useState(false);
   const [exType, setExType] = useState('Running');
   const [exDuration, setExDuration] = useState('');

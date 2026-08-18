@@ -1,9 +1,11 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { FoodItem, MealType, MealSuggestion } from '../types';
+import { useProfile } from '../contexts/ProfileContext';
+import { useLogs, useLogActions } from '../contexts/LogsContext';
 import { Card } from './ui/Card';
 import { Field } from './ui/Field';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
-import { FoodItem, MealLog, MealType, MacroTargets, MealSuggestion, UserProfile, WellnessPlan, WaterLog, WeightEntry } from '../types';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
 import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, computeConsumedMicros, PRIORITY_MICROS } from '../utils/nutritionAggregates';
@@ -25,32 +27,14 @@ import {
 } from '@tabler/icons-react';
 
 interface NutritionTrackerProps {
-  logs: MealLog[];
-  onAddFood: (meal: MealType, food: FoodItem) => void;
-  onUpdateLog: (log: MealLog) => void;
-  onDeleteLog: (logId: string) => void;
-  targets: MacroTargets;
-  profile: UserProfile;
-  selectedDate: string;
-  onSelectDate: (date: string) => void;
-  allFoodLogs: MealLog[];
-  onResetTodayLog: () => void;
-  plan?: WellnessPlan;
-  // Water
-  waterLog: WaterLog;
-  onLogWater: (ml: number) => void;
-  onResetWater: () => void;
-  // Weight (for PDF export summary)
-  weightHistory: WeightEntry[];
-  // Favourites
-  favouriteFoods: FoodItem[];
-  onAddFavourite: (food: FoodItem) => void;
-  onRemoveFavourite: (foodId: string) => void;
-  onQuickAddFavourite: (food: FoodItem, mealType: MealType) => void;
   /**
    * Which surface to render. Supplied by Dashboard in the v2 IA, where these
    * three views live under different top-level tabs; the internal sub-tab bar
    * is hidden when set. Left undefined, the component keeps its own sub-tabs.
+   *
+   * This is now the component's ONLY prop. Everything else it needs comes from
+   * the profile and logs contexts -- it was taking 20, repeated verbatim at
+   * three call sites in Dashboard.
    */
   view?: 'log' | 'trends' | 'analysis';
 }
@@ -59,12 +43,15 @@ const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
 const rangeOptions = [7, 14, 30];
 
-export const NutritionTracker: React.FC<NutritionTrackerProps> = ({
-  logs, onAddFood, onUpdateLog, onDeleteLog, targets, profile,
-  onResetTodayLog, selectedDate, onSelectDate, allFoodLogs, plan,
-  waterLog, onLogWater, onResetWater, weightHistory,
-  favouriteFoods, onAddFavourite, onRemoveFavourite, onQuickAddFavourite, view,
-}) => {
+export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
+  const { profile, plan, targets } = useProfile();
+  const {
+    foodLogs: logs, allFoodLogs, selectedDate, waterLog, weightHistory, favouriteFoods,
+  } = useLogs();
+  const {
+    onAddFood, onDeleteLog, onResetTodayLog, onSelectDate,
+    onLogWater, onResetWater, onAddFavourite, onRemoveFavourite, onQuickAddFavourite,
+  } = useLogActions();
   const [ownTab, setOwnTab] = useState<'log' | 'trends' | 'analysis'>('log');
   // When Dashboard drives the view, the internal sub-tabs are redundant.
   const activeTab = view ?? ownTab;
@@ -177,10 +164,6 @@ const isViewingToday = selectedDate === toISODateString();
     }
   };
 
-  const handleManualAdd = (food: FoodItem) => {
-    onAddFood(selectedMeal, food);
-    setIsAdding(false);
-  };
 
   const deleteLog = (id: string) => {
     if (window.confirm("Are you sure you want to delete this item?")) {

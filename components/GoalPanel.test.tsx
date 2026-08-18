@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GoalPanel } from './GoalPanel';
 import { aProfile, aWeightEntry } from '../test/fixtures';
+import { renderWithApp } from '../test/renderWithApp';
 import { StoredWeightGoal } from '../types';
 
 // 178cm: BMI 18.5 ≈ 58.6kg. Dates are far enough out to be a safe pace.
@@ -21,14 +22,12 @@ const renderPanel = (over: {
   return {
     onSetGoal,
     user: userEvent.setup(),
-    ...render(
-      <GoalPanel
-        profile={aProfile({ weightKg, heightCm: 178 })}
-        weightHistory={history}
-        goal={over.goal ?? null}
-        onSetGoal={onSetGoal}
-      />
-    ),
+    ...renderWithApp(<GoalPanel />, {
+      profile: aProfile({ weightKg, heightCm: 178 }),
+      weightHistory: history,
+      weightGoal: over.goal ?? null,
+      onSetWeightGoal: onSetGoal,
+    }),
   };
 };
 

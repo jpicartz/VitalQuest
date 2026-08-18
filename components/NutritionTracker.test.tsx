@@ -1,10 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NutritionTracker } from './NutritionTracker';
-import {
-  aProfile, aPlan, aMealLog, aFood, aWaterLog, aWeightEntry, TODAY,
-} from '../test/fixtures';
+import { aMealLog, aFood, aWeightEntry, TODAY } from '../test/fixtures';
+import { renderWithApp, AppOverrides } from '../test/renderWithApp';
 import { addDaysISO } from '../utils/dateUtils';
 
 /**
@@ -15,32 +14,15 @@ import { addDaysISO } from '../utils/dateUtils';
  * here is a surface a user can reach today.
  */
 
-type Props = Parameters<typeof NutritionTracker>[0];
-
-const renderTracker = (over: Partial<Props> = {}) => {
-  const props: Props = {
-    logs: [],
-    onAddFood: vi.fn(),
-    onUpdateLog: vi.fn(),
-    onDeleteLog: vi.fn(),
-    targets: { calories: 2654, protein: 118, carbs: 355, fat: 74 },
-    profile: aProfile(),
-    selectedDate: TODAY,
-    onSelectDate: vi.fn(),
-    allFoodLogs: [],
-    onResetTodayLog: vi.fn(),
-    plan: aPlan(),
-    waterLog: aWaterLog(),
-    onLogWater: vi.fn(),
-    onResetWater: vi.fn(),
-    weightHistory: [aWeightEntry()],
-    favouriteFoods: [],
-    onAddFavourite: vi.fn(),
-    onRemoveFavourite: vi.fn(),
-    onQuickAddFavourite: vi.fn(),
-    ...over,
+const renderTracker = (over: AppOverrides & { view?: 'log' | 'trends' | 'analysis' } = {}) => {
+  const { view, ...ctx } = over;
+  return {
+    user: userEvent.setup(),
+    ...renderWithApp(<NutritionTracker view={view} />, {
+      weightHistory: [aWeightEntry()],
+      ...ctx,
+    }),
   };
-  return { props, user: userEvent.setup(), ...render(<NutritionTracker {...props} />) };
 };
 
 // The sub-destinations are a real tablist now, and the range picker a real
@@ -78,13 +60,13 @@ describe('NutritionTracker — Food Log surfaces', () => {
   });
 
   it('lists a logged food with its macros', () => {
-    renderTracker({ logs: [aMealLog({ food: aFood({ name: 'Greek Yogurt', calories: 420 }) })] });
+    renderTracker({ foodLogs: [aMealLog({ food: aFood({ name: 'Greek Yogurt', calories: 420 }) })] });
     expect(screen.getByText('Greek Yogurt')).toBeInTheDocument();
     expect(screen.getByText('420')).toBeInTheDocument();
   });
 
   it('shows remaining calories against the target', () => {
-    renderTracker({ logs: [aMealLog({ food: aFood({ calories: 654 }) })] });
+    renderTracker({ foodLogs: [aMealLog({ food: aFood({ calories: 654 }) })] });
     expect(screen.getByText('2000')).toBeInTheDocument(); // 2654 - 654
   });
 
@@ -115,7 +97,7 @@ describe('NutritionTracker — Food Log surfaces', () => {
 });
 
 describe('NutritionTracker — Analysis surfaces', () => {
-  const withFood = { logs: [aMealLog({ food: aFood({ calories: 420, protein: 28, carbs: 38, fat: 18 }) })] };
+  const withFood = { foodLogs: [aMealLog({ food: aFood({ calories: 420, protein: 28, carbs: 38, fat: 18 }) })] };
 
   it('renders every Analysis section', async () => {
     const { user } = renderTracker(withFood);
@@ -159,7 +141,7 @@ describe('NutritionTracker — never renders NaN', () => {
   // NB: these must be UNPARSEABLE. '420' coerces to 420 and proves nothing —
   // it has to be a value like '420 kcal' that Number() genuinely rejects.
   const stringyMicros = {
-    logs: [aMealLog({
+    foodLogs: [aMealLog({
       food: aFood({
         calories: '420 kcal' as never,
         protein: '28 g' as never,
