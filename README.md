@@ -35,6 +35,8 @@ Four destinations, each answering one question.
 | **Goal** · *where am I heading?* | A target weight and date turn into today's calorie and protein numbers, plus an on/off-track verdict. Daily quests, weight and exercise logging, and trend charts sit alongside. |
 | **Coach** · *why?* | A scoped AI coach anchored to a real finding from your day, not a blank chat box. |
 
+> The reasoning behind the non-obvious choices — and what would have to change to reverse each one — is in [docs/decisions.md](docs/decisions.md).
+
 ### Body systems, not raw percentages
 
 "Vitamin B12: 34%" means nothing to most people. "Energy support: 33%" is a sentence.
@@ -86,7 +88,7 @@ Locked down further by a strict CSP with no `unsafe-inline`/`unsafe-eval` in `sc
 
 ## Run locally
 
-**Prerequisites:** Node.js 18+ and an [Anthropic API key](https://console.anthropic.com/).
+**Prerequisites:** Node.js 20 (what CI runs; 18+ will build) and an [Anthropic API key](https://console.anthropic.com/).
 
 ```bash
 git clone https://github.com/jpicartz/VitalQuest.git
@@ -149,7 +151,7 @@ contexts/              ProfileContext, LogsContext (data and actions split)
 services/              Claude API calls and prompts
 utils/                 Body systems, goal projection, coach safety, streaks, badges
 data/                  Nutrient reference data and badge definitions
-docs/                  Surface inventory and screenshots
+docs/                  Decision record, surface inventory, screenshots
 *.test.ts(x)           Colocated next to the module they cover
 ```
 
