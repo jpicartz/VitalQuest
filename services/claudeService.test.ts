@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood } from './claudeService';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood, generateNutritionInsights } from './claudeService';
+import { aProfile, aPlan } from '../test/fixtures';
+import { buildInsightsPayload } from '../utils/nutritionAggregates';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { PRIORITY_MICROS } from '../utils/nutritionAggregates';
 
@@ -258,5 +260,44 @@ describe('key-map invariants', () => {
     for (const alias of Object.keys(MICRO_KEY_MAP)) {
       expect(alias, `"${alias}" is unreachable because lookup lowercases first`).toBe(alias.toLowerCase());
     }
+  });
+});
+
+describe('generateNutritionInsights — hostile model output', () => {
+  // The component maps over patterns/insights/recommendations. A model that
+  // returns a string (or an object) where an array belongs used to pass the
+  // `|| []` check and then throw inside the render.
+  const payload = buildInsightsPayload(
+    [{ date: '2026-08-20', calories: 2000, protein: 100, carbs: 200, fat: 60, mealCount: 3, micros: {} }] as never,
+    2654,
+    118,
+  );
+
+  const withResponse = (text: string) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: [{ type: 'text', text }] }),
+    }));
+  };
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('coerces a string where an array belongs into an empty array', async () => {
+    withResponse(JSON.stringify({
+      headline: 'ok', patterns: 'not an array',
+      insights: [], recommendations: [], encouragement: 'x',
+    }));
+    const out = await generateNutritionInsights(payload, aProfile(), aPlan());
+    expect(Array.isArray(out.patterns)).toBe(true);
+    expect(out.patterns).toEqual([]);
+  });
+
+  it('drops non-string entries rather than rendering [object Object]', async () => {
+    withResponse(JSON.stringify({
+      headline: 'ok', patterns: ['real', { nested: 'object' }, 42, null],
+      insights: [], recommendations: [], encouragement: 'x',
+    }));
+    const out = await generateNutritionInsights(payload, aProfile(), aPlan());
+    expect(out.patterns).toEqual(['real']);
   });
 });

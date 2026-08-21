@@ -383,11 +383,15 @@ Return ONLY JSON: {"headline":"...","patterns":["..."],"insights":["..."],"recom
       2000
     );
     const data = parseJsonResponse(raw);
+    // `|| []` is not enough here: a model that returns a STRING for one of
+    // these passes the check and then throws on .map() in the component.
+    // Array.isArray is the guard the recipe path already uses.
+    const arr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
     return {
       headline: data.headline || 'Keep logging consistently.',
-      patterns: data.patterns || [],
-      insights: data.insights || [],
-      recommendations: data.recommendations || [],
+      patterns: arr(data.patterns),
+      insights: arr(data.insights),
+      recommendations: arr(data.recommendations),
       encouragement: data.encouragement,
     };
   } catch (error) {
