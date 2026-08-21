@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { readItem, writeItem, removeItem, StorageFailure } from './utils/safeStorage';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { ProfileProvider } from './contexts/ProfileContext';
@@ -13,7 +14,7 @@ import { updateStreak, resetQuestsIfNewDay } from './utils/streakUtils';
 import { checkBadges } from './utils/badgeUtils';
 import { computeMicroScore } from './utils/nutritionAggregates';
 import { calculateMetrics } from './utils/metricsUtils';
-import { IconBolt, IconSun, IconMoon } from '@tabler/icons-react';
+import { IconBolt, IconSun, IconMoon, IconAlertTriangle } from '@tabler/icons-react';
 
 type Theme = 'light' | 'dark';
 
@@ -41,21 +42,24 @@ const App: React.FC = () => {
   const [weightGoal, setWeightGoal] = useState<StoredWeightGoal | null>(null);
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
 
+  // Null while saving works. Set when a write fails so the UI can say so.
+  const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(null);
+
   // ── Theme (dual-mode) — isolated from vitalQuestData, own localStorage key ──
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('vitalQuestTheme');
+    const saved = readItem('vitalQuestTheme');
     if (saved === 'light' || saved === 'dark') return saved;
     return typeof window !== 'undefined'
       && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('vitalQuestTheme', theme);
+    writeItem('vitalQuestTheme', theme);
   }, [theme]);
 
   // ── Load from localStorage ────────────────────────────────────────────────
   useEffect(() => {
-    const savedData = localStorage.getItem('vitalQuestData');
+    const savedData = readItem('vitalQuestData');
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
@@ -105,11 +109,13 @@ const App: React.FC = () => {
   // ── Persist to localStorage ───────────────────────────────────────────────
   useEffect(() => {
     if (profile && metrics && plan) {
-      localStorage.setItem('vitalQuestData', JSON.stringify({
+      // A failed write means nothing the user does is being saved. Surface it
+      // rather than letting the app look like it is working.
+      setStorageFailure(writeItem('vitalQuestData', JSON.stringify({
         profile, metrics, plan, gamification, foodLogs,
         waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs,
         weightGoal,
-      }));
+      })));
     }
   }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, weightGoal]);
 
@@ -275,7 +281,7 @@ const App: React.FC = () => {
 
   // ── Reset ─────────────────────────────────────────────────────────────────
   const handleReset = () => {
-    localStorage.removeItem('vitalQuestData');
+    removeItem('vitalQuestData');
     setProfile(null);
     setMetrics(null);
     setPlan(null);
@@ -320,6 +326,20 @@ const App: React.FC = () => {
           </div>
         </div>
       </nav>
+      {storageFailure && (
+        <div role="alert" className="bg-fat/10 border-b border-fat/30 px-4 py-3">
+          <div className="max-w-4xl mx-auto flex items-start gap-3">
+            <IconAlertTriangle size={18} className="text-fat shrink-0 mt-0.5" />
+            <p className="text-sm text-fg">
+              <span className="font-bold">Your changes aren&apos;t being saved.</span>{' '}
+              {storageFailure === 'quota'
+                ? 'This browser\u2019s storage for the site is full. Exporting a PDF of anything you want to keep, then using Start Over, will clear space.'
+                : 'This browser is blocking site storage \u2014 private browsing usually does. VitalQuest still works for this session, but nothing will be here when you come back.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <main className="flex-grow">
         {view === 'onboarding' ? (
           <div className="py-12 px-4">
