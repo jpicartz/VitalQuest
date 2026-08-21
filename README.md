@@ -114,7 +114,7 @@ npm run test:run   # vitest, single run (what CI runs)
 
 ## Tests
 
-484 tests, run on every push by [CI](.github/workflows/ci.yml) alongside typecheck and build. Two Vitest projects: pure logic in a fast `node` environment, component tests in `jsdom` with Testing Library.
+494 tests, run on every push by [CI](.github/workflows/ci.yml) alongside typecheck and build. Two Vitest projects: pure logic in a fast `node` environment, component tests in `jsdom` with Testing Library.
 
 | Area | What's covered |
 |---|---|
@@ -128,6 +128,7 @@ npm run test:run   # vitest, single run (what CI runs)
 | `utils/badgeUtils.ts` | All 8 unlock thresholds, plus an invariant that every awardable badge id actually exists in the badge catalogue. |
 | `services/claudeService.ts` | Markdown-fence stripping and recovery from the malformed JSON LLMs emit — including a raw newline inside a string value. |
 | `components/` | That every surface in [the inventory](docs/v2-surface-inventory.md) is still reachable, plus the keyboard contract for tablists and radiogroups and that no form control ships unlabelled. |
+| `utils/safeStorage.ts` | That a browser blocking `localStorage` — Safari private browsing does — cannot crash the app, and that quota is distinguished from unavailable. jsdom's storage always succeeds, so nothing else would catch a regression. |
 
 Two of those component tests exist because of bugs that shipped silently and were caught by hand, not by a test:
 

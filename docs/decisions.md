@@ -123,7 +123,8 @@ image content. The comment in `api/claude.ts` says so.
 
 ## 7. No account, no database
 
-**Decision.** All state in `localStorage`. No auth, no backend store.
+**Decision.** All state in `localStorage`. No auth, no backend store. Every
+access goes through `utils/safeStorage.ts`, which cannot throw.
 
 **Why.** Nothing to breach, nothing to sell, no data-retention policy to write
 around. For a single-user health tracker the trade is strongly favourable.
@@ -131,6 +132,13 @@ around. For a single-user health tracker the trade is strongly favourable.
 **Honestly stated:** this caps what the product can become. No sync across
 devices, no sharing with a clinician, no recovery if the browser store is
 cleared. That was accepted knowingly, not overlooked.
+
+**What it cost:** writes were unguarded for a long time, and `setItem` throws
+outright in Safari private browsing — so the app crashed on first render there,
+in production, until an audit caught it. When persistence *is* the architecture,
+the failure path is not an edge case; it is the architecture failing. A failed
+write now surfaces a banner rather than being swallowed, because silently not
+saving is the same class of dishonesty as the medications field in §2.
 
 ---
 
