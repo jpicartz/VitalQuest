@@ -269,24 +269,53 @@ const isViewingToday = selectedDate === toISODateString();
         import('jspdf'),
       ]);
 
-      const canvas = await html2canvas(reportRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        // html2canvas renders a fresh clone of the DOM, which restarts every CSS
+        // animation from frame zero and then snapshots it immediately. The
+        // staggered entrance on the body-system tiles was therefore captured
+        // mid-fade, and the later tiles came out half-transparent in the PDF.
+        // Freezing animations in the clone captures their resting state instead.
+        // Only animation/transition are disabled -- forcing opacity here would
+        // also flatten the deliberately translucent surfaces.
+        onclone: (doc) => {
+          const freeze = doc.createElement('style');
+          freeze.textContent =
+            '*,*::before,*::after{animation:none!important;transition:none!important;}';
+          doc.head.appendChild(freeze);
+        },
+      });
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
 
-      // The report is far taller than one A4 page, so walk down the image one
-      // page at a time instead of clipping everything past the first page.
-      let remaining = imgHeight;
-      let offset = 0;
-      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight);
-      remaining -= pageHeight;
-      while (remaining > 0) {
-        offset -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, offset, pageWidth, imgHeight);
-        remaining -= pageHeight;
+      // The report is several A4 pages tall. Each page gets ONLY its own slice
+      // of the canvas: the previous version embedded the entire full-height PNG
+      // once per page and just repositioned it, which produced a 40 MB file for
+      // a one-day report.
+      const pxPerMm = canvas.width / pageWidth;
+      const pageHeightPx = Math.max(1, Math.floor(pageHeight * pxPerMm));
+
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      const ctx = slice.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context unavailable');
+
+      for (let y = 0, page = 0; y < canvas.height; y += pageHeightPx, page++) {
+        const sliceHeight = Math.min(pageHeightPx, canvas.height - y);
+        // Assigning height also clears the canvas, so no stale pixels carry over.
+        slice.height = sliceHeight;
+        ctx.drawImage(
+          canvas,
+          0, y, canvas.width, sliceHeight,
+          0, 0, canvas.width, sliceHeight,
+        );
+        if (page > 0) pdf.addPage();
+        pdf.addImage(
+          slice.toDataURL('image/png'), 'PNG',
+          0, 0, pageWidth, sliceHeight / pxPerMm,
+          undefined, 'FAST',
+        );
       }
 
       pdf.save(`vitalquest-report-${selectedDate}.pdf`);
