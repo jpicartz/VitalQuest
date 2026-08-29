@@ -19,7 +19,7 @@ interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
 }
 
 const ACCENT_BORDER: Record<Accent, string> = {
-  nutri: 'focus:border-nutri',
+  nutri: 'focus:border-accent',
   hydro: 'focus:border-hydro',
   spark: 'focus:border-spark',
 };
@@ -73,7 +73,7 @@ export const Field: React.FC<FieldProps> = ({
             ${emphasis ? 'text-lg font-bold' : ''}
             ${suffix ? 'pr-12' : ''}
             ${error ? 'border-fat' : `border-edge ${ACCENT_BORDER[accent]}`}
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
             focus-visible:ring-offset-2 focus-visible:ring-offset-page
             transition-colors`}
           {...rest}

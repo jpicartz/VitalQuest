@@ -32,20 +32,27 @@ export default {
           strong: withAlpha('--hydro-strong'),
         },
         spark: withAlpha('--spark'),
-        protein: withAlpha('--macro-protein'),
-        carbs: withAlpha('--macro-carbs'),
-        fat: withAlpha('--macro-fat'),
-        track: withAlpha('--track'),
-
-        // ── Legacy palette (ported from the old CDN config; kept so
-        //    not-yet-restyled components still render during the migration) ──
-        brand: {
-          50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac',
-          400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d',
-          800: '#166534', 900: '#14532d',
+        protein: {
+          DEFAULT: withAlpha('--macro-protein'),
+          strong: withAlpha('--macro-protein-strong'),
         },
-        accent: { 500: '#3b82f6', 600: '#2563eb' },
-        alert: { 500: '#ef4444' },
+        carbs: {
+          DEFAULT: withAlpha('--macro-carbs'),
+          strong: withAlpha('--macro-carbs-strong'),
+        },
+        fat: {
+          DEFAULT: withAlpha('--macro-fat'),
+          strong: withAlpha('--macro-fat-strong'),
+        },
+        track: withAlpha('--track'),
+        // Chrome only — see index.css. Never use for data.
+        accent: withAlpha('--accent'),
+
+        // The legacy brand/accent/alert palette lived here "so not-yet-restyled
+        // components still render during the migration". The migration is done —
+        // usage across components/ is zero — so it is gone. It also collided with
+        // the new semantic `accent` above, which is the real reason to remove it
+        // rather than leave dead keys around inviting reuse.
       },
       borderRadius: {
         control: '10px',

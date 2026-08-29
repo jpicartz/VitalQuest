@@ -89,8 +89,8 @@ export function SegmentedControl<T extends string | number>({
               segmentClassName ||
               'px-4 py-1.5 rounded-[8px] text-sm font-semibold whitespace-nowrap'
             } transition-colors focus-visible:outline-none focus-visible:ring-2
-              focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-raised
-              ${selected ? 'bg-card shadow-e1 text-nutri' : 'text-fg-soft hover:text-fg'}`}
+              focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-raised
+              ${selected ? 'bg-card shadow-e1 text-accent' : 'text-fg-soft hover:text-fg'}`}
           >
             {s.label}
           </button>

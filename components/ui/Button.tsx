@@ -35,15 +35,22 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyles =
     'px-6 py-3 rounded-control font-bold transition-all duration-200 ' +
     'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ' +
     'focus-visible:ring-offset-2 focus-visible:ring-offset-page';
 
   const variants = {
-    // *-strong carries the white label at AA in light mode; in dark mode the
-    // token equals the base accent and the label flips to dark.
-    primary: 'bg-nutri-strong text-white dark:text-[#08210f] shadow-lg shadow-nutri/25 border-b-[3px] border-black/15 hover:brightness-[1.05] active:border-b-0 active:translate-y-[3px]',
+    /*
+      The primary action is the signature accent, not a semantic hue. It used to
+      be nutri-strong, which made "the main button" and "nutrition" the same
+      colour — so a green primary sitting next to a green macro figure read as
+      if they were related.
+
+      Light mode carries white at 5.7:1; dark mode lightens the token and flips
+      the label to ink at the same ratio. Both measured, not assumed.
+    */
+    primary: 'bg-accent text-white dark:text-[#1c1c1e] shadow-lg shadow-accent/25 border-b-[3px] border-black/15 hover:brightness-[1.05] active:border-b-0 active:translate-y-[3px]',
     secondary: 'bg-hydro-strong text-white dark:text-[#04222e] shadow-lg shadow-hydro/25 border-b-[3px] border-black/15 hover:brightness-[1.05] active:border-b-0 active:translate-y-[3px]',
-    outline: 'border-2 border-edge text-fg-soft hover:border-nutri hover:text-nutri bg-card active:scale-[.98]',
+    outline: 'border-2 border-edge text-fg-soft hover:border-accent hover:text-accent bg-card active:scale-[.98]',
     ghost: 'text-fg-soft hover:text-fg hover:bg-raised active:scale-[.98]',
     // Destructive actions must not read as ordinary outline buttons.
     danger: 'border-2 border-fat/40 text-fat hover:bg-fat/10 hover:border-fat bg-card active:scale-[.98]',

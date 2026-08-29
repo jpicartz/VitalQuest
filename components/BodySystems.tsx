@@ -134,6 +134,7 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
             strokeWidth={8}
             colorClass={bandColor(weakest.score)}
             centerValue={<span className="text-3xl">{weakest.score}</span>}
+            layoutId={open?.id === weakest.id ? undefined : `system-ring-${weakest.id}`}
           />
           <div className="min-w-0">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-fg-mute">
@@ -172,6 +173,7 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
               strokeWidth={6}
               colorClass={bandColor(s.score)}
               centerValue={<span className="text-base">{s.score}</span>}
+              layoutId={open?.id === s.id ? undefined : `system-ring-${s.id}`}
             />
             <div className="text-center">
               <div className="text-xs font-bold text-fg leading-tight">{s.label}</div>
@@ -183,6 +185,27 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
         ))}
       </div>
 
+      {/*
+        The ring is the shared element. `layoutId` is keyed on the system id, so
+        opening Immune morphs THAT ring into the sheet — the same element moving
+        and scaling, rather than a second ring fading in on top of the first.
+
+        A `layoutId` can only be held by ONE element at a time. The grid stays
+        mounted behind the modal, so leaving the id on both meant two rings
+        claimed it at once and framer-motion simply rendered the second at its
+        final position — no travel at all. The source tile drops its id exactly
+        as the sheet takes it, which is what turns two rings into one moving one.
+
+        DELIBERATELY NOT wrapped in `AnimatePresence`. Doing so buys a morph on
+        the way out, and costs correctness: the dialog stays mounted for the
+        length of its exit animation, so a closed modal lingers in the
+        accessibility tree with `role="dialog"` still on it while focus has
+        already been restored underneath. The existing "closes on Escape" test
+        catches exactly that, and it is right to.
+
+        The morph in — the half anyone actually watches — needs no presence
+        wrapper, because framer-motion matches the layoutId as the sheet mounts.
+      */}
       {open && (
         <Modal
           onClose={() => setOpen(null)}
@@ -197,7 +220,7 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
               onClick={() => setOpen(null)}
               aria-label="Close"
               className="text-fg-mute hover:text-fg p-1 rounded-control focus-visible:outline-none
-                focus-visible:ring-2 focus-visible:ring-nutri"
+                focus-visible:ring-2 focus-visible:ring-accent"
             >
               <IconX size={20} />
             </button>
@@ -205,7 +228,13 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
           <p className="text-sm text-fg-soft mb-5">{open.blurb}</p>
 
           <div className="flex items-center gap-4 p-4 rounded-tile bg-raised border border-edge mb-5">
-            <ScoreRing value={open.score} size={64} strokeWidth={7} colorClass={bandColor(open.score)} />
+            <ScoreRing
+              value={open.score}
+              size={64}
+              strokeWidth={7}
+              colorClass={bandColor(open.score)}
+              layoutId={`system-ring-${open.id}`}
+            />
             <div>
               <div className={`text-sm font-bold ${bandColor(open.score)}`}>
                 {BAND_COPY[supportBand(open.score)]} support today

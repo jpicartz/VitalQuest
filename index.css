@@ -26,7 +26,28 @@
     --macro-protein: 22 163 74;    /* #16a34a */
     --macro-carbs: 245 158 11;     /* #f59e0b */
     --macro-fat: 244 63 94;        /* #f43f5e */
+    /* Label-on-tint variants, same idea as --nutri-strong and --hydro-strong.
+       A macro chip puts its own hue on a 15% wash of itself, which over a light
+       page is effectively text on white — and #f59e0b amber reads 2.1:1 there.
+       These are dark enough to carry the label at AA. */
+    --macro-protein-strong: 22 101 52; /* #166534  4.9:1 on its own 15% tint */
+    --macro-carbs-strong: 146 64 14;   /* #92400e  5.5:1 on its own 18% tint */
+    --macro-fat-strong: 190 18 60;     /* #be123c  4.6:1 on its own 15% tint */
     --track: 230 227 221;          /* #e6e3dd ring/bar track */
+
+    /* ── Signature accent ─────────────────────────────────────────────────
+       Owns CHROME only: focus rings, primary fills, selection, active states.
+       It is deliberately NOT one of the semantic hues. Those encode data —
+       green is nutrition, blue is water, amber is energy, and bandColor() maps
+       a score to red/amber/green — so borrowing one of them for buttons would
+       make the same colour mean two different things on one screen.
+
+       Violet was picked by measurement, not taste. The obvious candidate was
+       --nutri, and it fails: 2.92:1 as a ring on the page (needs 3) and 3.30:1
+       behind white label text (needs 4.5), which is the whole reason
+       --nutri-strong exists. This clears every surface in both themes with the
+       tightest pair at 5.70:1. */
+    --accent: 124 58 237;          /* #7c3aed  5.7:1 with white */
 
     /* ── Elevation ────────────────────────────────────────────────────────
        Light mode separates surfaces with shadow; dark mode separates them by
@@ -62,7 +83,15 @@
     --macro-protein: 74 222 128;   /* #4ade80 */
     --macro-carbs: 251 191 36;     /* #fbbf24 */
     --macro-fat: 251 113 133;      /* #fb7185 */
+    /* Dark mode puts the tint over a dark surface, so the light hue is already
+       the readable one — same reason --nutri-strong equals --nutri here. */
+    --macro-protein-strong: 74 222 128;
+    --macro-carbs-strong: 251 191 36;
+    --macro-fat-strong: 251 113 133;
     --track: 30 41 59;             /* #1e293b */
+    /* Lightened for dark surfaces, and paired with dark label text rather than
+       white — the same trick --nutri-strong uses in reverse. */
+    --accent: 167 139 250;         /* #a78bfa  5.7:1 with --fg dark text */
 
     /* Dark surfaces separate by value, not shadow. Level 1 goes to nothing;
        2 and 3 keep just enough to lift genuinely floating things (sheets,

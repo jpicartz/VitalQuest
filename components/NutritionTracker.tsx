@@ -6,6 +6,7 @@ import { Card } from './ui/Card';
 import { Field } from './ui/Field';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
+import { MetricChipRail, metricsFromFood, metricsFromWater, type Metric } from './ui/MetricChip';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
 import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, computeConsumedMicros, PRIORITY_MICROS } from '../utils/nutritionAggregates';
@@ -154,7 +155,7 @@ const isViewingToday = selectedDate === toISODateString();
         setAiError("We couldn't recognise any food in that. Try something like \"2 eggs and a slice of toast\".");
         return;
       }
-      foods.forEach(f => onAddFood(selectedMeal, f));
+      foods.forEach(f => logFood(selectedMeal, f));
       setAiInput('');
       setIsAdding(false);
     } catch (err) {
@@ -205,14 +206,14 @@ const isViewingToday = selectedDate === toISODateString();
                fat: 0,
                micros: { "Vitamin D": vitD }
            };
-           onAddFood('Snack', sunItem);
+           logFood('Snack', sunItem);
            setIsAddingSunlight(false);
            setSunlightMins('');
       }
   };
 
   const handleSaveWater = (ml: number) => {
-    onLogWater(ml);
+    logWater(ml);
     setWaterInput('');
     setIsAddingWater(false);
   };
@@ -251,7 +252,7 @@ const isViewingToday = selectedDate === toISODateString();
       fat: s.fat,
       micros: s.micros
     };
-    onAddFood(targetMeal, item);
+    logFood(targetMeal, item);
     setIsMealBuilderOpen(false);
     setMealSuggestions([]);
     setMealCriteria('');
@@ -327,8 +328,31 @@ const isViewingToday = selectedDate === toISODateString();
     }
   };
 
+  /*
+    Micro-feedback on log. `onAddFood` and `onLogWater` still do exactly what
+    they did — these wrappers only add the chips, so nothing about how a log is
+    recorded moves into this component.
+
+    Keyed by timestamp so a second log while the first burst is still on screen
+    replaces it cleanly instead of merging into it.
+  */
+  const [chips, setChips] = useState<Metric[]>([]);
+
+  const logFood = (meal: MealType, item: FoodItem) => {
+    onAddFood(meal, item);
+    setChips(metricsFromFood(item, Date.now()));
+  };
+
+  const logWater = (ml: number) => {
+    onLogWater(ml);
+    setChips(metricsFromWater(ml, Date.now()));
+  };
+
   return (
     <div className="space-y-6">
+      {/* Sits above the content so a burst never shifts the layout under the
+          user's finger mid-tap. */}
+      <MetricChipRail metrics={chips} className="min-h-[30px]" />
       {/* Hidden when Dashboard drives the view: the top-level tabs replace it. */}
       {!view && (
         <SegmentedControl<'log' | 'trends' | 'analysis'>
@@ -423,8 +447,8 @@ const isViewingToday = selectedDate === toISODateString();
                       <div className="h-full bg-hydro transition-all duration-500 rounded-full" style={{ width: `${waterPct}%` }} />
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => onLogWater(250)} className="flex-1 py-1.5 text-xs font-bold bg-hydro/10 text-hydro rounded-control hover:bg-hydro/20 transition-colors">+250 ml</button>
-                      <button onClick={() => onLogWater(500)} className="flex-1 py-1.5 text-xs font-bold bg-hydro/10 text-hydro rounded-control hover:bg-hydro/20 transition-colors">+500 ml</button>
+                      <button onClick={() => logWater(250)} className="flex-1 py-1.5 text-xs font-bold bg-hydro/10 text-hydro rounded-control hover:bg-hydro/20 transition-colors">+250 ml</button>
+                      <button onClick={() => logWater(500)} className="flex-1 py-1.5 text-xs font-bold bg-hydro/10 text-hydro rounded-control hover:bg-hydro/20 transition-colors">+500 ml</button>
                       <button onClick={() => setIsAddingWater(true)} className="flex-1 py-1.5 text-xs font-bold bg-hydro/10 text-hydro rounded-control hover:bg-hydro/20 transition-colors">Custom</button>
                       {waterLog.mlConsumed > 0 && (
                         <button onClick={onResetWater} aria-label="Reset water" className="py-1.5 px-2 text-fg-mute bg-raised rounded-control hover:text-fg transition-colors"><IconRefresh size={14} /></button>
@@ -1075,7 +1099,7 @@ const isViewingToday = selectedDate === toISODateString();
           profile={profile}
           onClose={() => setRecipeModal(null)}
           onAddToLog={() => {
-            onAddFood(targetMeal, {
+            logFood(targetMeal, {
               id: `meal-${Date.now()}`,
               name: recipeModal.name,
               servingSize: '1 serving',
