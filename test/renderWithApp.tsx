@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { ProfileProvider } from '../contexts/ProfileContext';
 import { LogsProvider, LogsValue, LogActionsValue } from '../contexts/LogsContext';
 import { UserProfile, CalculatedMetrics, WellnessPlan } from '../types';
+import { WeightUnit } from '../utils/units';
 import { aProfile, aMetrics, aPlan, aWaterLog, TODAY } from './fixtures';
 
 /**
@@ -15,6 +16,7 @@ import { aProfile, aMetrics, aPlan, aWaterLog, TODAY } from './fixtures';
  * the user can see, so their bodies had to stay still while the wiring moved.
  */
 export interface AppOverrides extends Partial<LogsValue>, Partial<LogActionsValue> {
+  onSetWeightUnit?: (unit: WeightUnit) => void;
   profile?: UserProfile;
   metrics?: CalculatedMetrics;
   plan?: WellnessPlan;
@@ -59,7 +61,7 @@ export const buildContexts = (over: AppOverrides = {}) => {
 export const renderWithApp = (ui: React.ReactElement, over: AppOverrides = {}) => {
   const { logs, actions, profile, metrics, plan } = buildContexts(over);
   const result = render(
-    <ProfileProvider profile={profile} metrics={metrics} plan={plan}>
+    <ProfileProvider profile={profile} metrics={metrics} plan={plan} onSetWeightUnit={over.onSetWeightUnit ?? vi.fn()}>
       <LogsProvider logs={logs} actions={actions}>{ui}</LogsProvider>
     </ProfileProvider>,
   );

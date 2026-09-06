@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { FoodItem, MealType, MealSuggestion } from '../types';
 import { useProfile } from '../contexts/ProfileContext';
+import { WeightUnit, toDisplayWeight } from '../utils/units';
 import { useTargets, useGoalAdjustment } from '../contexts/useTargets';
 import { useLogs, useLogActions } from '../contexts/LogsContext';
 import { Card } from './ui/Card';
@@ -47,6 +48,7 @@ const rangeOptions = [7, 14, 30];
 
 export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
   const { profile, plan } = useProfile();
+  const weightUnit: WeightUnit = profile.weightUnit ?? 'kg';
   // Goal-aware and date-aware: the target for the day on screen.
   const targets = useTargets();
   const goalAdjustment = useGoalAdjustment();
@@ -709,14 +711,14 @@ const isViewingToday = selectedDate === toISODateString();
                  <p className="inline-flex items-center gap-1 text-xs font-semibold text-fg-mute uppercase tracking-widest mb-1"><IconScale size={13} /> Weight</p>
                  {weightHistory.length > 0 ? (
                    <>
-                     <p className="nums text-2xl font-bold text-fg">{weightHistory[weightHistory.length - 1].kg} <span className="text-sm font-normal text-fg-mute">kg</span></p>
+                     <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(weightHistory[weightHistory.length - 1].kg, weightUnit)} <span className="text-sm font-normal text-fg-mute">{weightUnit}</span></p>
                      {weightHistory.length > 1 && (() => {
                        const baseline = (weightHistory.find(e => e.isBaseline) ?? weightHistory[0]).kg;
                        const current = weightHistory[weightHistory.length - 1].kg;
                        const delta = +(current - baseline).toFixed(1);
                        return (
                          <p className={`nums text-xs font-bold mt-1 ${delta < 0 ? 'text-nutri' : delta > 0 ? 'text-spark' : 'text-fg-mute'}`}>
-                           {delta > 0 ? '+' : ''}{delta} kg from start
+                           {delta > 0 ? '+' : ''}{toDisplayWeight(delta, weightUnit)} {weightUnit} from start
                          </p>
                        );
                      })()}

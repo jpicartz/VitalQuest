@@ -174,3 +174,68 @@ describe('GoalPanel — active goal', () => {
     expect(screen.getByRole('button', { name: /Update goal/ })).toBeInTheDocument();
   });
 });
+
+// ── Pounds ───────────────────────────────────────────────────────────────
+describe('GoalPanel in pounds', () => {
+  const lbsProfile = (over = {}) => aProfile({ weightKg: 82, heightCm: 178, weightUnit: 'lbs', ...over });
+
+  const renderLbs = (
+    over: { goal?: StoredWeightGoal | null; onSetGoal?: ReturnType<typeof vi.fn<(g: StoredWeightGoal | null) => void>> } = {},
+  ) => {
+    const onSetGoal = over.onSetGoal ?? vi.fn<(g: StoredWeightGoal | null) => void>();
+    return {
+      onSetGoal,
+      user: userEvent.setup(),
+      ...renderWithApp(<GoalPanel />, {
+        profile: lbsProfile(),
+        weightHistory: [aWeightEntry({ date: '2026-08-15', kg: 82 })],
+        weightGoal: over.goal ?? null,
+        onSetWeightGoal: onSetGoal,
+      }),
+    };
+  };
+
+  it('labels the field in pounds', () => {
+    renderLbs();
+    expect(screen.getByLabelText(/Target weight \(lbs\)/)).toBeInTheDocument();
+  });
+
+  it('shows the current weight in pounds', () => {
+    renderLbs();
+    // 82 kg = 180.8 lbs
+    expect(screen.getByText(/180\.8 lbs/)).toBeInTheDocument();
+  });
+
+  it('stores kg even though the user typed pounds', async () => {
+    // The invariant that matters: lbs never reaches storage. If it did, every
+    // BMI comparison in goalProjection would silently be against a lbs number.
+    const { user, onSetGoal } = renderLbs();
+    const field = screen.getByLabelText(/Target weight/);
+    await user.clear(field);
+    await user.type(field, '165');
+    await user.click(screen.getByRole('button', { name: 'Set goal' }));
+
+    expect(onSetGoal).toHaveBeenCalledTimes(1);
+    const saved = onSetGoal.mock.calls[0][0];
+    expect(saved.targetKg).toBeCloseTo(74.8, 1);   // 165 lbs
+    expect(saved.targetKg).not.toBeCloseTo(165, 0);
+  });
+
+  it('reloads a saved goal back into pounds without drift', async () => {
+    // Round-tripping must be stable, or re-opening the panel would creep the
+    // number every time. A saved goal opens in the summary view, so edit first.
+    const { user } = renderLbs({ goal: { targetKg: 74.8427, targetDate: '2027-06-01', setOn: '2026-08-15' } });
+    await user.click(screen.getByRole('button', { name: /Edit/ }));
+    expect((screen.getByLabelText(/Target weight/) as HTMLInputElement).value).toBe('165');
+  });
+
+  it('refuses in pounds, so the refusal can actually be evaluated', async () => {
+    // A safety message the reader cannot parse is a weaker guardrail.
+    const { user } = renderLbs();
+    const field = screen.getByLabelText(/Target weight/);
+    await user.clear(field);
+    await user.type(field, '99');   // ~45 kg — under the BMI floor at 178cm
+    expect(await screen.findByRole('alert')).toHaveTextContent(/lbs/);
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/ kg/);
+  });
+});

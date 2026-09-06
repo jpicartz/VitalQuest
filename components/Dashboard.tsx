@@ -12,6 +12,7 @@ import { WeightPanel } from './panels/WeightPanel';
 import { ExercisePanel } from './panels/ExercisePanel';
 import { AchievementsPanel } from './panels/AchievementsPanel';
 import { StatsPanel } from './panels/StatsPanel';
+import { UnitPreference } from './panels/UnitPreference';
 import { CoachTabPanel } from './panels/CoachTabPanel';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { useProfile } from '../contexts/ProfileContext';
@@ -221,6 +222,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <PlanDisplay plan={plan} />
             <AchievementsPanel gamification={gamification} />
             <StatsPanel gamification={gamification} />
+            <UnitPreference />
 
             <div className="pt-2 text-center">
               <Button

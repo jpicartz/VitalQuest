@@ -14,6 +14,7 @@ import { updateStreak, resetQuestsIfNewDay } from './utils/streakUtils';
 import { checkBadges } from './utils/badgeUtils';
 import { computeMicroScore } from './utils/nutritionAggregates';
 import { calculateMetrics } from './utils/metricsUtils';
+import { WeightUnit } from './utils/units';
 import { IconBolt, IconSun, IconMoon, IconAlertTriangle } from '@tabler/icons-react';
 
 type Theme = 'light' | 'dark';
@@ -217,6 +218,11 @@ const App: React.FC = () => {
   };
 
   // ── Weight ────────────────────────────────────────────────────────────────
+  // Display preference only — no weight changed, so nothing to recompute.
+  const handleSetWeightUnit = useCallback((unit: WeightUnit) => {
+    setProfile(prev => (prev ? { ...prev, weightUnit: unit } : prev));
+  }, []);
+
   const handleLogWeight = (kg: number) => {
     const today = toISODateString();
     setWeightHistory(prev => {
@@ -352,7 +358,7 @@ const App: React.FC = () => {
           </div>
         ) : (
           profile && metrics && plan && (
-            <ProfileProvider profile={profile} metrics={metrics} plan={plan}>
+            <ProfileProvider profile={profile} metrics={metrics} plan={plan} onSetWeightUnit={handleSetWeightUnit}>
               <LogsProvider
                 logs={{
                   foodLogs: selectedLogs,

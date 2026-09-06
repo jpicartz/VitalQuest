@@ -1,6 +1,7 @@
 import { UserProfile, WeightEntry, StoredWeightGoal, MacroTargets } from '../types';
 import { calculateMetrics, macrosFor } from './metricsUtils';
 import { toISODateString, parseISODate } from './dateUtils';
+import { WeightUnit, toDisplayWeight } from './units';
 
 /**
  * Weight-goal projection.
@@ -110,7 +111,14 @@ export const projectGoal = (
   profile: UserProfile,
   goal: WeightGoal,
   history: WeightEntry[],
-  todayISO: string = toISODateString()
+  todayISO: string = toISODateString(),
+  /**
+   * Display unit for the refusal messages ONLY. Every number this function
+   * computes and compares stays in kg — the BMI floor is not a rendering
+   * concern. This exists because a refusal the reader cannot evaluate is a
+   * weaker guardrail: "a target of 99 lbs" lands where "45 kg" does not.
+   */
+  unit: WeightUnit = 'kg',
 ): GoalProjection => {
   const currentKg = history.length
     ? Number([...history].sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0].kg)
@@ -138,7 +146,7 @@ export const projectGoal = (
     ({ ...base, ok: false, refusal, message, suggestion });
 
   if (!Number.isFinite(targetKg) || targetKg <= 0 || !Number.isFinite(heightCm) || heightCm <= 0) {
-    return refuse('invalid', 'That target does not look right. Enter a weight in kilograms.');
+    return refuse('invalid', `That target does not look right. Enter a weight in ${unit === 'lbs' ? 'pounds' : 'kilograms'}.`);
   }
 
   const daysRemaining = daysBetween(todayISO, goal.targetDate);
@@ -166,7 +174,7 @@ export const projectGoal = (
     const safeKg = Math.ceil(MIN_SAFE_BMI * Math.pow(heightCm / 100, 2) * 10) / 10;
     return refuse(
       'target-below-healthy-bmi',
-      `A target of ${targetKg} kg would put you below the healthy BMI range. The lowest weight this app will plan for at your height is ${safeKg} kg.`,
+      `A target of ${toDisplayWeight(targetKg, unit)} ${unit} would put you below the healthy BMI range. The lowest weight this app will plan for at your height is ${toDisplayWeight(safeKg, unit)} ${unit}.`,
       { targetKg: safeKg, targetDate: goal.targetDate }
     );
   }
@@ -178,7 +186,7 @@ export const projectGoal = (
     const safeDays = Math.ceil((remainingKg / maxWeekly) * 7);
     return refuse(
       'too-fast',
-      `That pace is about ${weeklyRateKg.toFixed(1)} kg per week. This app plans at most ${maxWeekly.toFixed(1)} kg per week — roughly 1% of bodyweight — because faster than that tends to cost muscle and rarely lasts.`,
+      `That pace is about ${toDisplayWeight(weeklyRateKg, unit)} ${unit} per week. This app plans at most ${toDisplayWeight(maxWeekly, unit)} ${unit} per week — roughly 1% of bodyweight — because faster than that tends to cost muscle and rarely lasts.`,
       { targetKg, targetDate: addDays(todayISO, safeDays) }
     );
   }

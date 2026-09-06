@@ -1,3 +1,4 @@
+import type { WeightUnit } from './utils/units';
 export enum Gender {
   Male = 'Male',
   Female = 'Female',
@@ -40,6 +41,12 @@ export interface UserProfile {
   dietaryRestrictions: DietaryRestriction[];
   medicationsOrConditions: string;
   sleepHours: number;
+  /**
+   * Display unit for weights. Storage is always kg — this only controls what
+   * the user types and reads. Optional so profiles saved before this existed
+   * hydrate cleanly; absent means kg.
+   */
+  weightUnit?: WeightUnit;
 }
 
 // Calculated locally

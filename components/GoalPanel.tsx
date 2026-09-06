@@ -5,6 +5,10 @@ import { Card } from './ui/Card';
 import { UserProfile, WeightEntry, StoredWeightGoal } from '../types';
 import { projectGoal } from '../utils/goalProjection';
 import { calculateMetrics } from '../utils/metricsUtils';
+import {
+  WeightUnit, toDisplayWeight, fromDisplayWeight, formatWeight,
+  formatWeightDelta, weightBounds, WEIGHT_STEP,
+} from '../utils/units';
 import { toISODateString, addDaysISO, parseISODate } from '../utils/dateUtils';
 import { Button } from './ui/Button';
 import {
@@ -34,23 +38,32 @@ export const GoalPanel: React.FC = () => {
     ? [...weightHistory].sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0].kg
     : profile.weightKg;
 
+  // Display unit. Storage stays kg everywhere; this only governs what is typed
+  // and read. Absent on profiles created before the preference was persisted.
+  const unit: WeightUnit = profile.weightUnit ?? 'kg';
+  const bounds = weightBounds(unit);
+
   const [editing, setEditing] = useState(!goal);
-  const [targetKg, setTargetKg] = useState(String(goal?.targetKg ?? ''));
+  // Holds what the user sees, in their unit — converted to kg only on save.
+  const [targetInput, setTargetInput] = useState(
+    goal ? String(toDisplayWeight(goal.targetKg, unit)) : '',
+  );
+  const targetKg = targetInput ? fromDisplayWeight(Number(targetInput), unit) : NaN;
   const [targetDate, setTargetDate] = useState(goal?.targetDate ?? addDaysISO(toISODateString(), 90));
 
   // Live projection of whatever is currently in the form.
-  const draft = targetKg
-    ? projectGoal(profile, { targetKg: Number(targetKg), targetDate }, weightHistory)
+  const draft = targetInput
+    ? projectGoal(profile, { targetKg, targetDate }, weightHistory, undefined, unit)
     : null;
 
   // Projection of the saved goal.
   const active = goal
-    ? projectGoal(profile, { targetKg: goal.targetKg, targetDate: goal.targetDate }, weightHistory)
+    ? projectGoal(profile, { targetKg: goal.targetKg, targetDate: goal.targetDate }, weightHistory, undefined, unit)
     : null;
 
   const save = (kg: number, date: string) => {
     onSetGoal({ targetKg: kg, targetDate: date, setOn: toISODateString() });
-    setTargetKg(String(kg));
+    setTargetInput(String(toDisplayWeight(kg, unit)));
     setTargetDate(date);
     setEditing(false);
   };
@@ -84,21 +97,22 @@ export const GoalPanel: React.FC = () => {
       {editing && (
         <div className="mt-4 space-y-4">
           <p className="text-xs text-fg-mute">
-            You&apos;re currently <span className="nums font-semibold text-fg-soft">{currentKg} kg</span>.
+            You&apos;re currently <span className="nums font-semibold text-fg-soft">{formatWeight(currentKg, unit)}</span>.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="goal-weight" className="block text-xs font-semibold text-fg-soft mb-1.5">
-                Target weight (kg)
+                Target weight ({unit})
               </label>
               <input
                 id="goal-weight"
                 type="number"
                 inputMode="decimal"
-                min={30}
-                max={300}
-                value={targetKg}
-                onChange={(e) => setTargetKg(e.target.value)}
+                min={bounds.min}
+                max={bounds.max}
+                step={WEIGHT_STEP}
+                value={targetInput}
+                onChange={(e) => setTargetInput(e.target.value)}
                 placeholder={String(currentKg)}
                 className="nums w-full p-3 rounded-control bg-raised border-2 border-edge text-fg placeholder:text-fg-mute focus:border-nutri focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2 focus-visible:ring-offset-card"
               />
@@ -131,7 +145,7 @@ export const GoalPanel: React.FC = () => {
                       onClick={acceptSuggestion}
                       className="mt-3 text-xs px-3 py-1.5"
                     >
-                      Use {draft.suggestion.targetKg} kg by {fmtDate(draft.suggestion.targetDate)}
+                      Use {formatWeight(draft.suggestion.targetKg, unit)} by {fmtDate(draft.suggestion.targetDate)}
                     </Button>
                   )}
                 </div>
@@ -141,9 +155,9 @@ export const GoalPanel: React.FC = () => {
 
           {draft?.ok && (
             <p className="nums text-sm text-fg-soft">
-              That&apos;s <span className="font-bold text-fg">{draft.remainingKg} kg</span> over{' '}
+              That&apos;s <span className="font-bold text-fg">{formatWeightDelta(draft.remainingKg, unit)}</span> over{' '}
               <span className="font-bold text-fg">{draft.daysRemaining} days</span> —
-              about {draft.weeklyRateKg} kg per week.
+              about {formatWeightDelta(draft.weeklyRateKg, unit)} per week.
             </p>
           )}
 
@@ -174,7 +188,7 @@ export const GoalPanel: React.FC = () => {
                 <Button
                   variant="ghost"
                   className="text-fat"
-                  onClick={() => { onSetGoal(null); setEditing(true); setTargetKg(''); }}
+                  onClick={() => { onSetGoal(null); setEditing(true); setTargetInput(''); }}
                 >
                   Clear
                 </Button>
@@ -189,9 +203,10 @@ export const GoalPanel: React.FC = () => {
         <div className="mt-4 space-y-5">
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'To go', value: `${active.remainingKg}`, unit: 'kg' },
+              // remainingKg and weeklyRateKg are DELTAS: they scale, never offset.
+              { label: 'To go', value: `${toDisplayWeight(active.remainingKg, unit)}`, unit },
               { label: 'Days left', value: `${active.daysRemaining}`, unit: '' },
-              { label: 'Per week', value: `${active.weeklyRateKg}`, unit: 'kg' },
+              { label: 'Per week', value: `${toDisplayWeight(active.weeklyRateKg, unit)}`, unit },
             ].map((s) => (
               <div key={s.label} className="p-3 rounded-tile bg-raised border border-edge">
                 <div className="text-[10px] font-semibold text-fg-mute uppercase tracking-wide">{s.label}</div>
@@ -214,7 +229,7 @@ export const GoalPanel: React.FC = () => {
               {active.dailyAdjustment === 0
                 ? 'Maintenance'
                 : `${Math.abs(active.dailyAdjustment)} kcal ${active.dailyAdjustment < 0 ? 'below' : 'above'} maintenance`}
-              {' · '}target {active.targetKg} kg by {fmtDate(active.projectedDate)}
+              {' · '}target {formatWeight(active.targetKg, unit)} by {fmtDate(active.projectedDate)}
             </p>
           </div>
 

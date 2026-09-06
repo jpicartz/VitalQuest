@@ -99,6 +99,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, isLoading })
       } else {
           const newUnit = unit as 'kg' | 'lbs';
           setWeightUnit(newUnit);
+          // Persist the choice. It used to live only in this component, so a
+          // user who entered pounds here read kilograms everywhere afterwards.
+          updateProfile('weightUnit', newUnit);
           if (profile.weightKg && newUnit === 'lbs') {
               setPounds(Math.round(profile.weightKg * 2.20462).toString());
           }

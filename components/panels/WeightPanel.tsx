@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProfile } from '../../contexts/ProfileContext';
+import { WeightUnit, toDisplayWeight, fromDisplayWeight } from '../../utils/units';
 import { useLogs, useLogActions } from '../../contexts/LogsContext';
 import { Card } from '../ui/Card';
 import { Field } from '../ui/Field';
@@ -14,14 +15,16 @@ import { Button } from '../ui/Button';
  */
 export const WeightPanel: React.FC = () => {
   const { profile } = useProfile();
+  // Storage stays kg; this governs entry and display only.
+  const unit: WeightUnit = profile.weightUnit ?? 'kg';
   const { weightHistory } = useLogs();
   const { onLogWeight } = useLogActions();
   const [weightInput, setWeightInput] = useState('');
 
   // Last 14 entries.
   const weightChartData = useMemo(
-    () => weightHistory.slice(-14).map(e => ({ date: e.date.slice(5), kg: e.kg })),
-    [weightHistory]
+    () => weightHistory.slice(-14).map(e => ({ date: e.date.slice(5), kg: toDisplayWeight(e.kg, unit) })),
+    [weightHistory, unit]
   );
 
   // Prefer the tagged baseline entry; fall back to first entry, then profile weight.
@@ -30,7 +33,9 @@ export const WeightPanel: React.FC = () => {
   const weightDelta = +(currentWeight - startingWeight).toFixed(1);
 
   const handleLogWeightSubmit = () => {
-    const kg = parseFloat(weightInput);
+    const typed = parseFloat(weightInput);
+    // Bounds are checked in kg so one canonical range governs both units.
+    const kg = fromDisplayWeight(typed, unit);
     if (!isNaN(kg) && kg > 20 && kg < 400) {
       onLogWeight(kg);
       setWeightInput('');
@@ -42,16 +47,16 @@ export const WeightPanel: React.FC = () => {
           <div className="flex gap-6 mb-4">
             <div>
               <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Starting</p>
-              <p className="nums text-2xl font-bold text-fg">{startingWeight} <span className="text-sm font-normal text-fg-mute">kg</span></p>
+              <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(startingWeight, unit)} <span className="text-sm font-normal text-fg-mute">{unit}</span></p>
             </div>
             <div>
               <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Current</p>
-              <p className="nums text-2xl font-bold text-fg">{currentWeight} <span className="text-sm font-normal text-fg-mute">kg</span></p>
+              <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(currentWeight, unit)} <span className="text-sm font-normal text-fg-mute">{unit}</span></p>
             </div>
             <div>
               <p className="text-[11px] text-fg-mute font-semibold uppercase tracking-wide">Change</p>
               <p className={`nums text-2xl font-bold ${weightDelta < 0 ? 'text-nutri' : weightDelta > 0 ? 'text-fat' : 'text-fg-mute'}`}>
-                {weightDelta > 0 ? '+' : ''}{weightDelta} <span className="text-sm font-normal">kg</span>
+                {weightDelta > 0 ? '+' : ''}{toDisplayWeight(weightDelta, unit)} <span className="text-sm font-normal">{unit}</span>
               </p>
             </div>
           </div>
@@ -62,7 +67,7 @@ export const WeightPanel: React.FC = () => {
                 <LineChart data={weightChartData}>
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#94a3b8' }} width={32} />
-                  <Tooltip formatter={(v: number) => [`${v} kg`, 'Weight']} contentStyle={{ background: 'rgb(var(--surface-card))', border: '1px solid rgb(var(--edge))', borderRadius: 12, color: 'rgb(var(--fg))' }} />
+                  <Tooltip formatter={(v: number) => [`${v} ${unit}`, 'Weight']} contentStyle={{ background: 'rgb(var(--surface-card))', border: '1px solid rgb(var(--edge))', borderRadius: 12, color: 'rgb(var(--fg))' }} />
                   <Line type="monotone" dataKey="kg" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e' }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -75,10 +80,10 @@ export const WeightPanel: React.FC = () => {
               labelHidden
               className="flex-1"
               accent="spark"
-              suffix="kg"
+              suffix={unit}
               type="number"
               step="0.1"
-              placeholder={`Today's weight (kg)`}
+              placeholder={`Today's weight (${unit})`}
               value={weightInput}
               onChange={e => setWeightInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleLogWeightSubmit()}

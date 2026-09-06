@@ -1,10 +1,18 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { UserProfile, CalculatedMetrics, WellnessPlan } from '../types';
+import { WeightUnit } from '../utils/units';
 
 export interface ProfileValue {
   profile: UserProfile;
   metrics: CalculatedMetrics;
   plan: WellnessPlan;
+  /**
+   * Change the display unit for weights. Deliberately narrow rather than a
+   * general profile setter: the rest of the profile is set at onboarding and
+   * an open mutation path would invite editing weight or height without
+   * recomputing the metrics that depend on them.
+   */
+  setWeightUnit: (unit: WeightUnit) => void;
 }
 
 /**
@@ -31,13 +39,15 @@ export const ProfileProvider: React.FC<{
   profile: UserProfile;
   metrics: CalculatedMetrics;
   plan: WellnessPlan;
+  onSetWeightUnit: (unit: WeightUnit) => void;
   children: React.ReactNode;
-}> = ({ profile, metrics, plan, children }) => {
+}> = ({ profile, metrics, plan, onSetWeightUnit, children }) => {
   const value = useMemo<ProfileValue>(() => ({
     profile,
     metrics,
     plan,
-  }), [profile, metrics, plan]);
+    setWeightUnit: onSetWeightUnit,
+  }), [profile, metrics, plan, onSetWeightUnit]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };
