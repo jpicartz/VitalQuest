@@ -4,6 +4,7 @@ import { useLogs, useLogActions } from '../contexts/LogsContext';
 import { Card } from './ui/Card';
 import { UserProfile, WeightEntry, StoredWeightGoal } from '../types';
 import { projectGoal } from '../utils/goalProjection';
+import { calculateMetrics } from '../utils/metricsUtils';
 import { toISODateString, addDaysISO, parseISODate } from '../utils/dateUtils';
 import { Button } from './ui/Button';
 import {
@@ -25,6 +26,8 @@ const fmtDate = (iso: string) =>
  */
 export const GoalPanel: React.FC = () => {
   const { profile } = useProfile();
+  // Plain maintenance, for the copy that contrasts it with the goal target.
+  const maintenanceCalories = calculateMetrics(profile).tdee;
   const { weightHistory, weightGoal: goal } = useLogs();
   const { onSetWeightGoal: onSetGoal } = useLogActions();
   const currentKg = weightHistory.length
@@ -141,6 +144,19 @@ export const GoalPanel: React.FC = () => {
               That&apos;s <span className="font-bold text-fg">{draft.remainingKg} kg</span> over{' '}
               <span className="font-bold text-fg">{draft.daysRemaining} days</span> —
               about {draft.weeklyRateKg} kg per week.
+            </p>
+          )}
+
+          {/* Says what saving actually does. The daily target is the thing that
+              changes, and it was previously not obvious it changed at all. */}
+          {draft?.ok && (
+            <p className="text-xs text-fg-soft leading-relaxed border-l-2 border-accent/40 pl-3">
+              This sets your daily calorie target to{' '}
+              <span className="nums font-bold text-fg">{draft.dailyCalories} kcal</span>{' '}
+              from today onward — it replaces the{' '}
+              <span className="nums">{maintenanceCalories} kcal</span> maintenance figure
+              across Today, your macro targets and the coach. Days you have already
+              logged keep the target they had.
             </p>
           )}
 

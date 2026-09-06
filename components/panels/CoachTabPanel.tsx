@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProfile } from '../../contexts/ProfileContext';
+import { useTargets } from '../../contexts/useTargets';
 import { useLogs } from '../../contexts/LogsContext';
 import { computeConsumedMicros } from '../../utils/nutritionAggregates';
 import { Card } from '../ui/Card';
@@ -19,7 +20,10 @@ import { IconMessageCircle, IconSparkles } from '@tabler/icons-react';
  * what to type — and a wider safety surface than a scoped conversation.
  */
 export const CoachTabPanel: React.FC = () => {
-  const { profile, plan, targets } = useProfile();
+  const { profile, plan } = useProfile();
+  // Same source as every other surface, so the coach is finally told the
+  // goal-adjusted number instead of raw maintenance.
+  const targets = useTargets();
   const { foodLogs } = useLogs();
   const planFocus = plan.nutritionFocus;
 

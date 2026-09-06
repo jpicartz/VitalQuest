@@ -1,13 +1,23 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { UserProfile, CalculatedMetrics, WellnessPlan, MacroTargets } from '../types';
+import { UserProfile, CalculatedMetrics, WellnessPlan } from '../types';
 
 export interface ProfileValue {
   profile: UserProfile;
   metrics: CalculatedMetrics;
   plan: WellnessPlan;
-  /** Derived from metrics, in one place. Was recomputed inline at 3 call sites. */
-  targets: MacroTargets;
 }
+
+/**
+ * NOTE: daily targets deliberately do NOT live here.
+ *
+ * `targets` used to be a re-shaping of `metrics` — `{ calories: metrics.tdee,
+ * ...metrics.macros }` — which meant it could not see the user's weight goal
+ * and was frozen at the onboarding weight. Every calorie surface in the app
+ * read it, so the goal changed nothing anywhere.
+ *
+ * Use `useTargets()` from ./useTargets instead. Keeping a second, simpler
+ * accessor here would just be a way to get the wrong number by accident.
+ */
 
 const ProfileContext = createContext<ProfileValue | null>(null);
 
@@ -27,7 +37,6 @@ export const ProfileProvider: React.FC<{
     profile,
     metrics,
     plan,
-    targets: { calories: metrics.tdee, ...metrics.macros },
   }), [profile, metrics, plan]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

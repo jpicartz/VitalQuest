@@ -15,6 +15,7 @@ import { StatsPanel } from './panels/StatsPanel';
 import { CoachTabPanel } from './panels/CoachTabPanel';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { useProfile } from '../contexts/ProfileContext';
+import { useTargets } from '../contexts/useTargets';
 import { useLogs } from '../contexts/LogsContext';
 import {
   IconFlame, IconApple, IconBowl, IconHeartbeat, IconTargetArrow,
@@ -44,7 +45,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpdateGamification,
   onReset,
 }) => {
-  const { metrics, plan } = useProfile();
+  const { plan } = useProfile();
+  // The header's denominator is a target, so it follows the same source as
+  // every other target rather than raw maintenance.
+  const targets = useTargets();
   // The shell needs only today's calorie total; every panel reads its own data.
   const { foodLogs } = useLogs();
   const [activeTab, setActiveTab] = useState<TabId>('today');
@@ -99,7 +103,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <IconApple size={20} className="text-nutri" />
             <div>
               <div className="nums text-lg font-bold text-fg leading-none">
-                {caloriesConsumed}<span className="text-xs font-normal text-fg-soft"> / {Math.round(metrics.tdee)}</span>
+                {caloriesConsumed}<span className="text-xs font-normal text-fg-soft"> / {targets.calories}</span>
               </div>
               <div className="text-[11px] text-fg-soft">kcal eaten</div>
             </div>

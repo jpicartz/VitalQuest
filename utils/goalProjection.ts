@@ -1,5 +1,5 @@
-import { UserProfile, WeightEntry } from '../types';
-import { calculateMetrics } from './metricsUtils';
+import { UserProfile, WeightEntry, StoredWeightGoal, MacroTargets } from '../types';
+import { calculateMetrics, macrosFor } from './metricsUtils';
 import { toISODateString, parseISODate } from './dateUtils';
 
 /**
@@ -8,9 +8,15 @@ import { toISODateString, parseISODate } from './dateUtils';
  * SAFETY: the refusal rules in this file are the app's primary eating-disorder
  * guardrail, and they live here — in deterministic code — rather than in an AI
  * prompt. A calorie tracker with an AI coach has real ED exposure, and a system
- * prompt is the weakest possible place for the highest-severity rule. Because
- * the coach reads its context from this module, it inherits a system that
- * already refuses to plan a dangerous target.
+ * prompt is the weakest possible place for the highest-severity rule.
+ *
+ * `targetsForDate` at the bottom of this file is the ONLY producer of daily
+ * calorie and macro targets in the app. Everything downstream — Today's
+ * remaining calories, the macro bars, the body-system scores, the trend lines,
+ * the coach's prompt, the meal suggester — reads from it, so all of them
+ * inherit these refusals by construction. That was not true before: each of
+ * those surfaces read raw TDEE, and this comment claimed an inheritance the
+ * code did not implement.
  */
 
 /** ~7700 kcal per kg of body fat — the standard planning figure. */
@@ -207,4 +213,56 @@ export const projectGoal = (
     paceKgPerWeek: pace,
     onTrack,
   };
+};
+
+/**
+ * The calorie and macro targets in force on a given day.
+ *
+ * The single source of daily targets. Three things it guarantees:
+ *
+ *   1. Maintenance is computed from the profile's CURRENT weight, so targets
+ *      follow a weigh-in instead of staying pinned to the onboarding snapshot.
+ *   2. A goal governs only days from the one it was set on. Earlier days keep
+ *      the target they were logged against, so editing a goal never rewrites
+ *      how a past day reads.
+ *   3. A refused goal yields maintenance, never a deficit. The guardrails
+ *      cannot be sidestepped by reading targets instead of the projection —
+ *      which is the whole reason this function lives in this file.
+ */
+export const targetsForDate = (
+  profile: UserProfile,
+  goal: StoredWeightGoal | null,
+  forDateISO: string,
+  history: WeightEntry[] = [],
+): MacroTargets => {
+  const base = calculateMetrics(profile);
+  const maintenance: MacroTargets = { calories: base.tdee, ...base.macros };
+
+  if (!goal) return maintenance;
+  // ISO dates compare correctly as strings, so no parsing is needed here.
+  if (forDateISO < goal.setOn) return maintenance;
+
+  const projection = projectGoal(profile, goal, history, forDateISO);
+  if (!projection.ok) return maintenance;
+
+  return { calories: projection.dailyCalories, ...macrosFor(profile, projection.dailyCalories) };
+};
+
+/**
+ * How far the day's target sits from plain maintenance, for the UI to explain
+ * itself. Returns null when no goal is in force — the caller then says nothing
+ * rather than displaying "0 below maintenance".
+ */
+export const goalAdjustmentForDate = (
+  profile: UserProfile,
+  goal: StoredWeightGoal | null,
+  forDateISO: string,
+  history: WeightEntry[] = [],
+): number | null => {
+  if (!goal || forDateISO < goal.setOn) return null;
+  const projection = projectGoal(profile, goal, history, forDateISO);
+  if (!projection.ok) return null;
+  const maintenance = calculateMetrics(profile).tdee;
+  const delta = projection.dailyCalories - maintenance;
+  return delta === 0 ? null : delta;
 };

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  projectGoal, observedPace,
+  projectGoal, observedPace, targetsForDate, goalAdjustmentForDate,
   MIN_SAFE_BMI, MIN_SAFE_CALORIES, MAX_DAILY_DEFICIT,
 } from './goalProjection';
+import { calculateMetrics } from './metricsUtils';
 import { UserProfile, WeightEntry, Gender, ActivityLevel, Goal } from '../types';
 
 const TODAY = '2026-08-15';
@@ -259,5 +260,111 @@ describe('projectGoal — pace tracking', () => {
     );
     expect(r.currentKg).toBe(80);
     expect(r.remainingKg).toBe(2);
+  });
+});
+
+describe('targetsForDate', () => {
+  const goal = (over: Partial<{ targetKg: number; targetDate: string; setOn: string }> = {}) => ({
+    targetKg: 76, targetDate: '2027-06-01', setOn: TODAY, ...over,
+  });
+
+  const maintenanceOf = (p = profile()) => {
+    const m = calculateMetrics(p);
+    return { calories: m.tdee, ...m.macros };
+  };
+
+  it('returns plain maintenance when there is no goal', () => {
+    expect(targetsForDate(profile(), null, TODAY)).toEqual(maintenanceOf());
+  });
+
+  it('leaves days before the goal was set untouched', () => {
+    // The whole point of scoping by setOn: editing a goal must not rewrite how
+    // an already-logged day reads.
+    const before = '2026-08-14';
+    expect(targetsForDate(profile(), goal(), before)).toEqual(maintenanceOf());
+  });
+
+  it('applies the goal from the day it was set', () => {
+    const out = targetsForDate(profile(), goal(), TODAY);
+    expect(out.calories).not.toBe(maintenanceOf().calories);
+    expect(out.calories).toBeLessThan(maintenanceOf().calories); // losing weight
+  });
+
+  it('applies it on later days too', () => {
+    expect(targetsForDate(profile(), goal(), '2026-09-30').calories)
+      .toBeLessThan(maintenanceOf().calories);
+  });
+
+  // ── The safety-critical ones ──────────────────────────────────────────
+  it('falls back to maintenance when the goal is refused for being below BMI floor', () => {
+    // A user already under the healthy BMI must never receive a deficit target,
+    // no matter which surface asks for it.
+    const underweight = profile({ weightKg: 55 });
+    const out = targetsForDate(underweight, goal({ targetKg: 50 }), TODAY);
+    expect(out).toEqual(maintenanceOf(underweight));
+  });
+
+  it('falls back to maintenance when the TARGET is below the BMI floor', () => {
+    const out = targetsForDate(profile(), goal({ targetKg: 50 }), TODAY);
+    expect(out).toEqual(maintenanceOf());
+  });
+
+  it('falls back to maintenance when the pace is refused as too fast', () => {
+    const out = targetsForDate(profile(), goal({ targetKg: 76, targetDate: '2026-08-22' }), TODAY);
+    expect(out).toEqual(maintenanceOf());
+  });
+
+  it('never returns calories below the safety floor', () => {
+    const out = targetsForDate(profile({ weightKg: 60 }), goal({ targetKg: 59, targetDate: '2026-08-25' }), TODAY);
+    expect(out.calories).toBeGreaterThanOrEqual(MIN_SAFE_CALORIES);
+  });
+
+  // ── Macro behaviour ───────────────────────────────────────────────────
+  it('holds protein while the calorie budget drops', () => {
+    // Protein is the macro to protect in a deficit; it is bodyweight-scaled,
+    // not a share of the budget.
+    const p = profile();
+    expect(targetsForDate(p, goal(), TODAY).protein).toBe(maintenanceOf(p).protein);
+  });
+
+  it('scales carbs down with the calorie budget', () => {
+    const p = profile();
+    expect(targetsForDate(p, goal(), TODAY).carbs).toBeLessThan(maintenanceOf(p).carbs);
+  });
+
+  it('tracks the current profile weight rather than an onboarding snapshot', () => {
+    // The bug this replaces: metrics were computed once and never again, so
+    // every target stayed pinned to onboarding-day weight.
+    const lighter = targetsForDate(profile({ weightKg: 70 }), null, TODAY);
+    const heavier = targetsForDate(profile({ weightKg: 90 }), null, TODAY);
+    expect(heavier.calories).toBeGreaterThan(lighter.calories);
+  });
+});
+
+describe('goalAdjustmentForDate', () => {
+  const g = { targetKg: 76, targetDate: '2027-06-01', setOn: TODAY };
+
+  it('is null with no goal, so the UI stays silent', () => {
+    expect(goalAdjustmentForDate(profile(), null, TODAY)).toBeNull();
+  });
+
+  it('is null before the goal was set', () => {
+    expect(goalAdjustmentForDate(profile(), g, '2026-08-01')).toBeNull();
+  });
+
+  it('is null when the goal was refused — nothing to explain', () => {
+    expect(goalAdjustmentForDate(profile({ weightKg: 55 }), { ...g, targetKg: 50 }, TODAY)).toBeNull();
+  });
+
+  it('reports a negative number for a deficit', () => {
+    const delta = goalAdjustmentForDate(profile(), g, TODAY);
+    expect(delta).not.toBeNull();
+    expect(delta!).toBeLessThan(0);
+  });
+
+  it('agrees with the difference targetsForDate actually produces', () => {
+    const delta = goalAdjustmentForDate(profile(), g, TODAY)!;
+    const target = targetsForDate(profile(), g, TODAY).calories;
+    expect(target - calculateMetrics(profile()).tdee).toBe(delta);
   });
 });

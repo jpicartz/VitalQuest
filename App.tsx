@@ -224,9 +224,14 @@ const App: React.FC = () => {
       const filtered = prev.filter(e => e.isBaseline || e.date !== today);
       return [...filtered, { date: today, kg }].sort((a, b) => a.date.localeCompare(b.date));
     });
-    // Update profile's current weight too
+    // Update the profile's current weight, and recompute the metrics derived
+    // from it. Before this, `metrics` was written at onboarding and never
+    // again, so BMI and BMR stayed pinned to the starting weight forever.
+    // Forward-only by nature: nothing recomputes past days.
     if (profile) {
-      setProfile({ ...profile, weightKg: kg });
+      const updated = { ...profile, weightKg: kg };
+      setProfile(updated);
+      setMetrics(calculateMetrics(updated));
     }
   };
 

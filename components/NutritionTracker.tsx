@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { FoodItem, MealType, MealSuggestion } from '../types';
 import { useProfile } from '../contexts/ProfileContext';
+import { useTargets, useGoalAdjustment } from '../contexts/useTargets';
 import { useLogs, useLogActions } from '../contexts/LogsContext';
 import { Card } from './ui/Card';
 import { Field } from './ui/Field';
@@ -24,7 +25,7 @@ import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
   IconSparkles, IconCalendar, IconStar, IconStarFilled, IconChevronDown, IconChevronUp,
   IconPlus, IconTrash, IconScale, IconFileText, IconBowl, IconFlame, IconCheck,
-  IconMicrophone, IconPlayerStopFilled,
+  IconMicrophone, IconPlayerStopFilled, IconTargetArrow,
 } from '@tabler/icons-react';
 
 interface NutritionTrackerProps {
@@ -45,7 +46,10 @@ const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const rangeOptions = [7, 14, 30];
 
 export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
-  const { profile, plan, targets } = useProfile();
+  const { profile, plan } = useProfile();
+  // Goal-aware and date-aware: the target for the day on screen.
+  const targets = useTargets();
+  const goalAdjustment = useGoalAdjustment();
   const {
     foodLogs: logs, allFoodLogs, selectedDate, waterLog, weightHistory, favouriteFoods,
   } = useLogs();
@@ -427,6 +431,15 @@ const isViewingToday = selectedDate === toISODateString();
                 <div>
                    <h3 className="font-semibold text-fg-soft text-xs uppercase tracking-wide">Calories Remaining</h3>
                    <div className="nums text-4xl font-bold text-fg">{Math.max(0, Math.round(targets.calories - consumedMacros.calories))}</div>
+                   {/* Only shown when a goal is actually moving this number, so
+                       nothing changes for someone who has not set one. */}
+                   {goalAdjustment !== null && (
+                     <p className="nums text-xs text-fg-soft mt-1.5 inline-flex items-center gap-1">
+                       <IconTargetArrow size={13} className="text-accent shrink-0" />
+                       Goal-adjusted · {Math.abs(goalAdjustment)} kcal{' '}
+                       {goalAdjustment < 0 ? 'below' : 'above'} maintenance
+                     </p>
+                   )}
                 </div>
                 <div className="text-right">
                    <div className="text-xs text-fg-soft uppercase tracking-wide">Eaten</div>

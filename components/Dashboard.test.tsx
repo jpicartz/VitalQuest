@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dashboard } from './Dashboard';
-import { aGamification, aMealLog, aFood, aWeightEntry, anExercise } from '../test/fixtures';
+import { aGamification, aMealLog, aFood, aWeightEntry, anExercise, TODAY } from '../test/fixtures';
 import { renderWithApp, AppOverrides } from '../test/renderWithApp';
 
 /**
@@ -292,5 +292,66 @@ describe('Profile sheet', () => {
     expect(onReset).not.toHaveBeenCalled();
     await user.click(within(confirm).getByRole('button', { name: /Yes, Start Over/ }));
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── The weight goal must actually reach the number on screen ─────────────
+describe('Goal-driven calorie target', () => {
+  const remaining = () =>
+    Number(screen.getByText('Calories Remaining').parentElement!.querySelector('.nums')!.textContent);
+
+  const goal = (over = {}) => ({
+    targetKg: 68, targetDate: '2027-06-01', setOn: TODAY, ...over,
+  });
+
+  it('lowers Today\'s target when a lose-weight goal is set', () => {
+    // The bug: projectGoal produced a number that only the Goal tab ever read,
+    // so this figure never moved no matter what goal you set.
+    const { unmount } = renderDashboard();
+    const withoutGoal = remaining();
+    unmount();
+
+    renderDashboard({ weightGoal: goal() });
+    expect(remaining()).toBeLessThan(withoutGoal);
+  });
+
+  it('explains itself inline rather than silently changing', () => {
+    renderDashboard({ weightGoal: goal() });
+    expect(screen.getByText(/Goal-adjusted/)).toBeInTheDocument();
+    expect(screen.getByText(/below maintenance/)).toBeInTheDocument();
+  });
+
+  it('says nothing when no goal is set', () => {
+    renderDashboard();
+    expect(screen.queryByText(/Goal-adjusted/)).not.toBeInTheDocument();
+  });
+
+  it('leaves a day before the goal was set untouched', () => {
+    const { unmount } = renderDashboard({ selectedDate: '2026-01-05' });
+    const before = remaining();
+    unmount();
+
+    renderDashboard({ selectedDate: '2026-01-05', weightGoal: goal({ setOn: TODAY }) });
+    expect(remaining()).toBe(before);
+    expect(screen.queryByText(/Goal-adjusted/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to maintenance when the goal is refused, never a deficit', () => {
+    // A target under the healthy BMI floor must not quietly become a deficit
+    // just because a different surface asked for the number.
+    const { unmount } = renderDashboard();
+    const maintenance = remaining();
+    unmount();
+
+    renderDashboard({ weightGoal: goal({ targetKg: 45 }) });
+    expect(remaining()).toBe(maintenance);
+    expect(screen.queryByText(/Goal-adjusted/)).not.toBeInTheDocument();
+  });
+
+  it('shows the same target in the header as on Today', () => {
+    renderDashboard({ weightGoal: goal() });
+    const headerTarget = screen.getByText('kcal eaten').previousElementSibling!.textContent!;
+    const target = Number(headerTarget.split('/')[1].trim());
+    expect(target + 0).toBe(remaining()); // nothing eaten in the fixture
   });
 });
