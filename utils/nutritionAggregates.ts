@@ -48,9 +48,17 @@ export const computeConsumedMicros = (
  * input to the `nutrition-nerd` badge, and body systems are a presentation
  * layer over the same consumed map rather than a replacement for it.
  */
-export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => {
-  const consumed = computeConsumedMicros(logs, dateISO);
-
+/**
+ * Score an already-aggregated consumed map.
+ *
+ * Exists so the score and the tiles provably read the SAME numbers. They used
+ * to re-aggregate independently — `computeConsumedMicros(logs)` with no date
+ * and `computeMicroScore(logs, selectedDate)` with one — which happened to
+ * agree only because the caller pre-filtered its logs. Any future caller
+ * passing unfiltered logs would have made the headline score disagree with the
+ * tiles underneath it, silently.
+ */
+export const scoreFromConsumed = (consumed: Record<string, number>): number => {
   let totalRatio = 0;
   let count = 0;
   PRIORITY_MICROS.forEach(key => {
@@ -62,9 +70,11 @@ export const computeMicroScore = (logs: MealLog[], dateISO?: string): number => 
     totalRatio += Math.max(0, Math.min(ratio, 1));
     count++;
   });
-
   return count === 0 ? 0 : Math.round((totalRatio / count) * 100);
 };
+
+export const computeMicroScore = (logs: MealLog[], dateISO?: string): number =>
+  scoreFromConsumed(computeConsumedMicros(logs, dateISO));
 
 export interface DailyNutritionSummary {
   label: string;
@@ -172,4 +182,23 @@ export const buildInsightsPayload = (
       meals: d.mealCount,
     })),
   };
+};
+
+/**
+ * The weight that was true on a given day: the most recent entry on or before
+ * it, not the most recent entry overall.
+ *
+ * The Daily Summary used `weightHistory[weightHistory.length - 1]`, so a report
+ * for last Tuesday showed today's weight. Returns null when the log started
+ * after that date — there is no honest number to show for a day before you
+ * began weighing yourself.
+ */
+export const weightOnDate = (
+  history: { date: string; kg: number }[],
+  dateISO: string,
+): number | null => {
+  const onOrBefore = history
+    .filter(e => e.date <= dateISO)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return onOrBefore.length ? onOrBefore[onOrBefore.length - 1].kg : null;
 };

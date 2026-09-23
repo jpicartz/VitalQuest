@@ -4,10 +4,17 @@ import userEvent from '@testing-library/user-event';
 import { GoalPanel } from './GoalPanel';
 import { aProfile, aWeightEntry } from '../test/fixtures';
 import { renderWithApp } from '../test/renderWithApp';
+import { addDaysISO, toISODateString } from '../utils/dateUtils';
 import { StoredWeightGoal } from '../types';
 
-// 178cm: BMI 18.5 ≈ 58.6kg. Dates are far enough out to be a safe pace.
-const FUTURE = '2027-06-01';
+// 178cm: BMI 18.5 ≈ 58.6kg.
+//
+// These dates MUST be relative to the real today: GoalPanel renders the live
+// component, which reads toISODateString() internally. A hardcoded future date
+// silently becomes a past one — '2026-09-14' did exactly that and turned the
+// crash-diet test into a date-in-past test months later.
+const FUTURE = addDaysISO(toISODateString(), 400);   // comfortably safe pace
+const TOO_SOON = addDaysISO(toISODateString(), 21);  // 12 kg in 3 weeks
 
 const renderPanel = (over: {
   weightKg?: number;
@@ -96,7 +103,7 @@ describe('GoalPanel — refusals', () => {
 
   it('blocks a crash-diet pace and offers a later date', async () => {
     const { user, onSetGoal } = renderPanel({ weightKg: 82 });
-    await setTarget(user, '70', '2026-09-14');   // ~2.8 kg/week
+    await setTarget(user, '70', TOO_SOON);   // ~4 kg/week
     expect(await screen.findByRole('alert')).toHaveTextContent(/per week/i);
     expect(screen.getByRole('button', { name: 'Set goal' })).toBeDisabled();
     expect(onSetGoal).not.toHaveBeenCalled();

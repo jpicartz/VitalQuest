@@ -11,7 +11,7 @@ import { Button } from './ui/Button';
 import { MetricChipRail, metricsFromFood, metricsFromWater, type Metric } from './ui/MetricChip';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
-import { getLastNDaysSummaries, getWeeklyMacroTotals, computeMicroScore, computeConsumedMicros, PRIORITY_MICROS } from '../utils/nutritionAggregates';
+import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, scoreFromConsumed, weightOnDate, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
@@ -123,7 +123,17 @@ const isViewingToday = selectedDate === toISODateString();
   // Shared with computeMicroScore so the tiles and the score can never disagree.
   const consumedMicros = useMemo(() => computeConsumedMicros(logs), [logs]);
 
-  const microScore = computeMicroScore(logs, selectedDate);
+  // Everything in the Daily Summary must describe the day being viewed.
+  const weightOnSelectedDate = useMemo(
+    () => weightOnDate(weightHistory, selectedDate),
+    [weightHistory, selectedDate],
+  );
+
+  // Scored from the SAME map the tiles render, not re-aggregated. Previously
+  // this called computeMicroScore(logs, selectedDate) while the tiles used an
+  // unfiltered aggregation; they agreed only because `logs` arrives
+  // pre-filtered by App. One of them changing would have been invisible.
+  const microScore = scoreFromConsumed(consumedMicros);
 
   // Find "nailed" nutrients (>= 100% of target)
   const nailedNutrients = Object.keys(NUTRIENT_INFO)
@@ -701,20 +711,33 @@ const isViewingToday = selectedDate === toISODateString();
                {/* Water */}
                <div className="bg-hydro/10 rounded-tile p-4">
                  <p className="inline-flex items-center gap-1 text-xs font-semibold text-hydro uppercase tracking-widest mb-1"><IconDroplet size={13} /> Water</p>
-                 <p className="nums text-2xl font-bold text-hydro">{waterLog.mlConsumed} <span className="text-sm font-normal opacity-70">/ {Math.min(Math.round(profile.weightKg * 35), 3500)} ml</span></p>
-                 <div className="h-1.5 bg-hydro/20 rounded-full mt-2 overflow-hidden">
-                   <div className="h-full bg-hydro rounded-full" style={{ width: `${Math.min(Math.round((waterLog.mlConsumed / Math.min(Math.round(profile.weightKg * 35), 3500)) * 100), 100)}%` }} />
-                 </div>
+                 {/* Only one day of water is stored (waterLog is a single
+                     {date, mlConsumed}), so a past day has no figure to show.
+                     It used to render today's number regardless of the date
+                     being viewed, which made a past report quietly wrong. */}
+                 {waterLog.date === selectedDate ? (
+                   <>
+                     <p className="nums text-2xl font-bold text-hydro">{waterLog.mlConsumed} <span className="text-sm font-normal opacity-70">/ {Math.min(Math.round(profile.weightKg * 35), 3500)} ml</span></p>
+                     <div className="h-1.5 bg-hydro/20 rounded-full mt-2 overflow-hidden">
+                       <div className="h-full bg-hydro rounded-full" style={{ width: `${Math.min(Math.round((waterLog.mlConsumed / Math.min(Math.round(profile.weightKg * 35), 3500)) * 100), 100)}%` }} />
+                     </div>
+                   </>
+                 ) : (
+                   <p className="text-sm text-fg-mute italic mt-1">Only tracked for today</p>
+                 )}
                </div>
                {/* Weight */}
                <div className="bg-raised rounded-tile p-4">
                  <p className="inline-flex items-center gap-1 text-xs font-semibold text-fg-mute uppercase tracking-widest mb-1"><IconScale size={13} /> Weight</p>
-                 {weightHistory.length > 0 ? (
+                 {/* The weight in force on the day being viewed, not the most
+                     recent weigh-in: a report for last Tuesday was showing
+                     today's weight. */}
+                 {weightOnSelectedDate !== null ? (
                    <>
-                     <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(weightHistory[weightHistory.length - 1].kg, weightUnit)} <span className="text-sm font-normal text-fg-mute">{weightUnit}</span></p>
+                     <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(weightOnSelectedDate, weightUnit)} <span className="text-sm font-normal text-fg-mute">{weightUnit}</span></p>
                      {weightHistory.length > 1 && (() => {
                        const baseline = (weightHistory.find(e => e.isBaseline) ?? weightHistory[0]).kg;
-                       const current = weightHistory[weightHistory.length - 1].kg;
+                       const current = weightOnSelectedDate;
                        const delta = +(current - baseline).toFixed(1);
                        return (
                          <p className={`nums text-xs font-bold mt-1 ${delta < 0 ? 'text-nutri' : delta > 0 ? 'text-spark' : 'text-fg-mute'}`}>
@@ -744,8 +767,21 @@ const isViewingToday = selectedDate === toISODateString();
                { name: 'Fat',      kcal: fatKcal,     grams: Math.round(consumedMacros.fat),     color: COLORS[2] },
              ];
              const hasData = totalKcal > 0;
+             // The logged calorie figure and the macro grams come from the same
+             // AI response but are not derived from each other, so they rarely
+             // agree exactly: fibre, alcohol and rounding all land in the gap.
+             // Showing 900 here and 1000 on Today with both labelled "kcal" was
+             // the bug — the numbers are fine, the silence about them was not.
+             const loggedKcal = Math.round(consumedMacros.calories);
+             const unaccounted = loggedKcal - totalKcal;
+             // 2% or 20 kcal, whichever is larger: below that it is rounding.
+             const materialGap = Math.abs(unaccounted) > Math.max(20, loggedKcal * 0.02);
+
              return (
-               <Card title="Calorie Breakdown">
+               <Card
+                 title="Calorie Breakdown"
+                 description={`How today's ${loggedKcal} logged kcal split across the macros.`}
+               >
                  {hasData ? (
                    <div className="flex flex-col sm:flex-row items-center gap-6">
                      <div className="relative w-44 h-44 shrink-0">
@@ -762,7 +798,7 @@ const isViewingToday = selectedDate === toISODateString();
                        </ResponsiveContainer>
                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                          <span className="nums text-2xl font-bold text-fg">{totalKcal}</span>
-                         <span className="text-xs text-fg-mute font-medium">kcal</span>
+                         <span className="text-xs text-fg-mute font-medium">kcal from macros</span>
                        </div>
                      </div>
                      <div className="flex flex-col gap-3 flex-1 w-full">
@@ -785,6 +821,19 @@ const isViewingToday = selectedDate === toISODateString();
                      <IconBowl size={40} className="mb-2 opacity-60" />
                      <p className="text-sm font-medium">Log food to see your macro breakdown</p>
                    </div>
+                 )}
+
+                 {/* Reconcile the two figures rather than leaving the reader to
+                     notice they differ. Only when the gap is bigger than
+                     rounding — otherwise this is noise on every single day. */}
+                 {hasData && materialGap && (
+                   <p className="nums text-xs text-fg-mute mt-4 pt-3 border-t border-edge">
+                     {loggedKcal} kcal logged · {Math.abs(unaccounted)}{' '}
+                     {unaccounted > 0 ? 'not explained by these macros' : 'more than the logged total'}.{' '}
+                     <span className="text-fg-soft">
+                       Fibre, alcohol and rounding usually account for the difference.
+                     </span>
+                   </p>
                  )}
                </Card>
              );

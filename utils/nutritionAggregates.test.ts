@@ -7,6 +7,7 @@ import {
   buildInsightsPayload,
   PRIORITY_MICROS,
   DailyNutritionSummary,
+  weightOnDate,
 } from './nutritionAggregates';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { MealLog, FoodItem } from '../types';
@@ -290,5 +291,40 @@ describe('buildInsightsPayload', () => {
     expect(payload.calorieTarget).toBe(2100);
     expect(payload.proteinTarget).toBe(120);
     expect(payload.dailyBreakdown[0].calories).toBe(2000);
+  });
+});
+
+describe('weightOnDate', () => {
+  const history = [
+    { date: '2026-09-01', kg: 82 },
+    { date: '2026-09-10', kg: 80 },
+    { date: '2026-09-20', kg: 78 },
+  ];
+
+  it('returns the weight in force on that day, not the latest overall', () => {
+    // The bug: a report for the 12th showed 78 kg because that was the newest
+    // entry, even though on the 12th the user weighed 80.
+    expect(weightOnDate(history, '2026-09-12')).toBe(80);
+  });
+
+  it('uses an exact match when the day has its own entry', () => {
+    expect(weightOnDate(history, '2026-09-10')).toBe(80);
+  });
+
+  it('returns the latest when asked about today', () => {
+    expect(weightOnDate(history, '2026-09-30')).toBe(78);
+  });
+
+  it('returns null before the log began rather than inventing a number', () => {
+    expect(weightOnDate(history, '2026-08-31')).toBeNull();
+  });
+
+  it('handles an empty history', () => {
+    expect(weightOnDate([], '2026-09-12')).toBeNull();
+  });
+
+  it('does not assume the history is sorted', () => {
+    const shuffled = [history[2], history[0], history[1]];
+    expect(weightOnDate(shuffled, '2026-09-12')).toBe(80);
   });
 });
