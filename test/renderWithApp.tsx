@@ -30,6 +30,7 @@ export const buildContexts = (over: AppOverrides = {}) => {
     waterLog: over.waterLog ?? aWaterLog(),
     weightHistory: over.weightHistory ?? [],
     favouriteFoods: over.favouriteFoods ?? [],
+    recipes: over.recipes ?? [],
     exerciseLogs: over.exerciseLogs ?? [],
     weightGoal: over.weightGoal ?? null,
   };
@@ -43,6 +44,8 @@ export const buildContexts = (over: AppOverrides = {}) => {
     onResetWater: over.onResetWater ?? vi.fn(),
     onLogWeight: over.onLogWeight ?? vi.fn(),
     onSetWeightGoal: over.onSetWeightGoal ?? vi.fn(),
+    onSaveRecipe: over.onSaveRecipe ?? vi.fn(),
+    onDeleteRecipe: over.onDeleteRecipe ?? vi.fn(),
     onAddFavourite: over.onAddFavourite ?? vi.fn(),
     onRemoveFavourite: over.onRemoveFavourite ?? vi.fn(),
     onQuickAddFavourite: over.onQuickAddFavourite ?? vi.fn(),

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import {
   MealLog, MealType, FoodItem, WaterLog, WeightEntry, ExerciseEntry, StoredWeightGoal,
 } from '../types';
+import { SavedRecipe } from '../utils/recipes';
 
 /** Everything the user has logged. Changes constantly. */
 export interface LogsValue {
@@ -13,6 +14,7 @@ export interface LogsValue {
   waterLog: WaterLog;
   weightHistory: WeightEntry[];
   favouriteFoods: FoodItem[];
+  recipes: SavedRecipe[];
   exerciseLogs: ExerciseEntry[];
   weightGoal: StoredWeightGoal | null;
 }
@@ -28,6 +30,8 @@ export interface LogActionsValue {
   onResetWater: () => void;
   onLogWeight: (kg: number) => void;
   onSetWeightGoal: (goal: StoredWeightGoal | null) => void;
+  onSaveRecipe: (recipe: SavedRecipe) => void;
+  onDeleteRecipe: (id: string) => void;
   onAddFavourite: (food: FoodItem) => void;
   onRemoveFavourite: (foodId: string) => void;
   onQuickAddFavourite: (food: FoodItem, mealType: MealType) => void;
@@ -52,7 +56,7 @@ export const LogsProvider: React.FC<{
 }> = ({ logs, actions, children }) => {
   const logsValue = useMemo(() => logs, [
     logs.foodLogs, logs.allFoodLogs, logs.selectedDate, logs.waterLog,
-    logs.weightHistory, logs.favouriteFoods, logs.exerciseLogs, logs.weightGoal,
+    logs.weightHistory, logs.favouriteFoods, logs.exerciseLogs, logs.weightGoal, logs.recipes,
   ]);
   // Callers pass a memoized `actions`; this guard keeps the value stable even
   // if one of them ever forgets.

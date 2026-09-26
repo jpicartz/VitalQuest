@@ -16,6 +16,7 @@ import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/date
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
 import { RecipeModal } from './RecipeModal';
+import { RecipeBuilderModal } from './RecipeBuilderModal';
 import { Modal } from './ui/Modal';
 import { BodySystems } from './BodySystems';
 import { Coach } from './Coach';
@@ -26,7 +27,7 @@ import {
   IconX, IconChevronLeft, IconChevronRight, IconDroplet, IconRefresh, IconSun,
   IconSparkles, IconCalendar, IconStar, IconStarFilled, IconChevronDown, IconChevronUp,
   IconPlus, IconTrash, IconScale, IconFileText, IconBowl, IconFlame, IconCheck,
-  IconMicrophone, IconPlayerStopFilled, IconTargetArrow,
+  IconMicrophone, IconPlayerStopFilled, IconTargetArrow, IconChefHat,
 } from '@tabler/icons-react';
 
 interface NutritionTrackerProps {
@@ -53,10 +54,10 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
   const targets = useTargets();
   const goalAdjustment = useGoalAdjustment();
   const {
-    foodLogs: logs, allFoodLogs, selectedDate, waterLog, weightHistory, favouriteFoods,
+    foodLogs: logs, allFoodLogs, selectedDate, waterLog, weightHistory, favouriteFoods, recipes,
   } = useLogs();
   const {
-    onAddFood, onDeleteLog, onResetTodayLog, onSelectDate,
+    onAddFood, onDeleteLog, onResetTodayLog, onSelectDate, onSaveRecipe, onDeleteRecipe,
     onLogWater, onResetWater, onAddFavourite, onRemoveFavourite, onQuickAddFavourite,
   } = useLogActions();
   const [ownTab, setOwnTab] = useState<'log' | 'trends' | 'analysis'>('log');
@@ -77,6 +78,7 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingSunlight, setIsAddingSunlight] = useState(false);
   const [isMealBuilderOpen, setIsMealBuilderOpen] = useState(false);
+  const [isRecipesOpen, setIsRecipesOpen] = useState(false);
   
   const [selectedMeal, setSelectedMeal] = useState<MealType>('Breakfast');
   const [aiInput, setAiInput] = useState('');
@@ -481,9 +483,10 @@ const isViewingToday = selectedDate === toISODateString();
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="grid grid-cols-3 gap-3 mb-6">
                     <button onClick={() => setIsAddingSunlight(true)} className="inline-flex items-center justify-center gap-2 py-3 bg-spark/10 rounded-tile font-bold text-spark hover:bg-spark/20 transition-colors"><IconSun size={18} /> Sunlight</button>
                     <button onClick={() => setIsMealBuilderOpen(true)} className="inline-flex items-center justify-center gap-2 py-3 bg-nutri/10 rounded-tile font-bold text-nutri hover:bg-nutri/20 transition-colors"><IconSparkles size={18} /> Builder</button>
+                    <button onClick={() => setIsRecipesOpen(true)} className="inline-flex items-center justify-center gap-2 py-3 bg-accent/10 rounded-tile font-bold text-accent hover:bg-accent/20 transition-colors"><IconChefHat size={18} /> Recipes</button>
                   </div>
                 </>
               ) : (
@@ -495,8 +498,9 @@ const isViewingToday = selectedDate === toISODateString();
                   </div>
 
                   {/* Meal builder still available for past-day edits */}
-                  <div className="mb-6">
-                    <button onClick={() => setIsMealBuilderOpen(true)} className="w-full inline-flex items-center justify-center gap-2 py-3 bg-nutri/10 rounded-tile font-bold text-nutri hover:bg-nutri/20 transition-colors"><IconSparkles size={18} /> Builder</button>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <button onClick={() => setIsMealBuilderOpen(true)} className="inline-flex items-center justify-center gap-2 py-3 bg-nutri/10 rounded-tile font-bold text-nutri hover:bg-nutri/20 transition-colors"><IconSparkles size={18} /> Builder</button>
+                    <button onClick={() => setIsRecipesOpen(true)} className="inline-flex items-center justify-center gap-2 py-3 bg-accent/10 rounded-tile font-bold text-accent hover:bg-accent/20 transition-colors"><IconChefHat size={18} /> Recipes</button>
                   </div>
                 </>
               )}
@@ -527,7 +531,7 @@ const isViewingToday = selectedDate === toISODateString();
                           <div key={food.id} className="px-4 py-3 flex justify-between items-center hover:bg-raised transition-colors">
                             <div className="flex-1">
                               <p className="font-medium text-fg text-sm">{food.name}</p>
-                              <p className="nums text-xs text-fg-mute">{food.calories} kcal · P:{food.protein}g C:{food.carbs}g F:{food.fat}g</p>
+                              <p className="nums text-xs text-fg-mute">{Math.round(Number(food.calories) || 0)} kcal · P:{food.protein}g C:{food.carbs}g F:{food.fat}g</p>
                             </div>
                             <div className="flex items-center gap-2">
                               <button
@@ -555,7 +559,7 @@ const isViewingToday = selectedDate === toISODateString();
                     <div key={type} className="bg-card rounded-card border border-edge shadow-e1 overflow-hidden">
                       <div className="bg-raised p-4 flex justify-between items-center border-b border-edge">
                         <h4 className="font-bold text-fg">{type}</h4>
-                        <span className="nums text-sm text-fg-soft">{mealLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0)} kcal</span>
+                        <span className="nums text-sm text-fg-soft">{Math.round(mealLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0))} kcal</span>
                       </div>
                       <div className="divide-y divide-edge">
                         {mealLogs.length === 0 ? (
@@ -568,7 +572,7 @@ const isViewingToday = selectedDate === toISODateString();
                                  <div className="nums text-xs text-fg-mute">P: {log.food.protein}g • C: {log.food.carbs}g • F: {log.food.fat}g</div>
                                </div>
                                <div className="flex items-center gap-3">
-                                   <div className="nums font-bold text-fg-soft">{log.food.calories}</div>
+                                   <div className="nums font-bold text-fg-soft">{Math.round(Number(log.food.calories) || 0)}</div>
                                    <div className="flex gap-1.5">
                                        {(() => {
                                          const existingFav = favouriteFoods.find(f => f.name === log.food.name);
@@ -1097,6 +1101,16 @@ const isViewingToday = selectedDate === toISODateString();
             </Button>
         </Modal>
       )}
+      {isRecipesOpen && (
+        <RecipeBuilderModal
+          recipes={recipes}
+          onSave={onSaveRecipe}
+          onDelete={onDeleteRecipe}
+          onLog={(meal, food) => { onAddFood(meal, food); setIsRecipesOpen(false); }}
+          onClose={() => setIsRecipesOpen(false)}
+        />
+      )}
+
       {isMealBuilderOpen && (
         <Modal onClose={() => setIsMealBuilderOpen(false)} labelledBy="mealbuilder-modal-title" className="bg-card rounded-modal p-6 max-w-2xl w-full shadow-e3 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
@@ -1145,7 +1159,7 @@ const isViewingToday = selectedDate === toISODateString();
                       </div>
                       <p className="text-fg-soft text-sm mb-3">{s.description}</p>
                       <div className="nums flex gap-3 text-sm">
-                        <span className="font-bold text-fg">{s.calories} kcal</span>
+                        <span className="font-bold text-fg">{Math.round(Number(s.calories) || 0)} kcal</span>
                         <span className="text-fg-soft">P: <span className="font-semibold text-fg">{s.protein}g</span></span>
                         <span className="text-fg-soft">C: <span className="font-semibold text-fg">{s.carbs}g</span></span>
                         <span className="text-fg-soft">F: <span className="font-semibold text-fg">{s.fat}g</span></span>

@@ -15,6 +15,7 @@ import { checkBadges } from './utils/badgeUtils';
 import { computeMicroScore } from './utils/nutritionAggregates';
 import { calculateMetrics } from './utils/metricsUtils';
 import { WeightUnit } from './utils/units';
+import { SavedRecipe } from './utils/recipes';
 import { IconBolt, IconSun, IconMoon, IconAlertTriangle } from '@tabler/icons-react';
 
 type Theme = 'light' | 'dark';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
   const [waterLog, setWaterLog] = useState<WaterLog>({ date: toISODateString(), mlConsumed: 0 });
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
   const [favouriteFoods, setFavouriteFoods] = useState<FoodItem[]>([]);
+  const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
   const [lifetimeQuestsCompleted, setLifetimeQuestsCompleted] = useState<number>(0);
   const [weightGoal, setWeightGoal] = useState<StoredWeightGoal | null>(null);
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
@@ -98,6 +100,7 @@ const App: React.FC = () => {
 
           setWeightHistory(parsed.weightHistory || []);
           setFavouriteFoods(parsed.favouriteFoods || []);
+          setRecipes(parsed.recipes || []);
           setExerciseLogs(parsed.exerciseLogs || []);
           setView('dashboard');
         }
@@ -114,11 +117,11 @@ const App: React.FC = () => {
       // rather than letting the app look like it is working.
       setStorageFailure(writeItem('vitalQuestData', JSON.stringify({
         profile, metrics, plan, gamification, foodLogs,
-        waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs,
+        waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes,
         weightGoal,
       })));
     }
-  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, weightGoal]);
+  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, weightGoal, recipes]);
 
   // ── Badge checker — runs whenever gamification changes ────────────────────
   const runBadgeCheck = useCallback((
@@ -271,6 +274,15 @@ const App: React.FC = () => {
   };
 
   // ── Favourites ────────────────────────────────────────────────────────────
+  const handleSaveRecipe = (recipe: SavedRecipe) => {
+    // Replace on re-save so editing a recipe does not leave a stale twin.
+    setRecipes(prev => [recipe, ...prev.filter(r => r.id !== recipe.id)]);
+  };
+
+  const handleDeleteRecipe = (id: string) => {
+    setRecipes(prev => prev.filter(r => r.id !== id));
+  };
+
   const handleAddFavourite = (food: FoodItem) => {
     setFavouriteFoods(prev => {
       if (prev.some(f => f.id === food.id || f.name === food.name)) return prev;
@@ -367,6 +379,7 @@ const App: React.FC = () => {
                   waterLog,
                   weightHistory,
                   favouriteFoods,
+                  recipes,
                   exerciseLogs,
                   weightGoal,
                 }}
@@ -380,6 +393,8 @@ const App: React.FC = () => {
                   onResetWater: handleResetWater,
                   onLogWeight: handleLogWeight,
                   onSetWeightGoal: setWeightGoal,
+                  onSaveRecipe: handleSaveRecipe,
+                  onDeleteRecipe: handleDeleteRecipe,
                   onAddFavourite: handleAddFavourite,
                   onRemoveFavourite: handleRemoveFavourite,
                   onQuickAddFavourite: handleQuickAddFavourite,

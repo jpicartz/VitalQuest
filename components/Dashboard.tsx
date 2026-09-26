@@ -74,7 +74,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const dailyQuests = plan.dailyQuests ?? [];
 
 
-  const caloriesConsumed = foodLogs.reduce((acc, l) => acc + l.food.calories, 0);
+  const caloriesConsumed = foodLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0);
 
 
 
@@ -104,7 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <IconApple size={20} className="text-nutri" />
             <div>
               <div className="nums text-lg font-bold text-fg leading-none">
-                {caloriesConsumed}<span className="text-xs font-normal text-fg-soft"> / {targets.calories}</span>
+                {Math.round(caloriesConsumed)}<span className="text-xs font-normal text-fg-soft"> / {targets.calories}</span>
               </div>
               <div className="text-[11px] text-fg-soft">kcal eaten</div>
             </div>
