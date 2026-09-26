@@ -54,6 +54,7 @@ const callClaude = async (
   let data: {
     error?: string | { message?: string };
     content?: { text?: string }[];
+    stop_reason?: string;
   };
   try {
     data = await response.json();
@@ -71,11 +72,78 @@ const callClaude = async (
     throw new Error(detail || `Request failed (${response.status}). Please try again.`);
   }
 
+  // A response that ran out of room is CUT MID-TOKEN, so the JSON is
+  // unterminated and parsing it throws something unreadable like "Unterminated
+  // string at position 6065". That surfaced to users as "could not reach the
+  // service", which is both wrong and unactionable: the service answered
+  // fine, there was just too much to say. Name it here, at the point where it
+  // is still distinguishable.
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error(
+      'That was too much to process in one go — the response was cut off. Try splitting it into fewer items.'
+    );
+  }
+
   const text = data.content?.[0]?.text;
   if (typeof text !== 'string') {
     throw new Error('The AI returned an empty response. Please try again.');
   }
   return text.trim();
+};
+
+/**
+ * Repair a JSON document whose brackets do not balance.
+ *
+ * Models occasionally emit structurally broken JSON while reporting a normal
+ * stop. The real case that prompted this: a seven-ingredient recipe came back
+ * with all seven ingredients and every value intact, but with 22 opening
+ * braces to 20 closing ones — the array was closed before two objects inside
+ * it were. Appending closers cannot fix that, because the `]` arrives early;
+ * the missing braces belong BEFORE it.
+ *
+ * So this walks the document and, whenever a closer appears while inner
+ * structures are still open, emits the closers needed to unwind first. Strings
+ * and escapes are tracked so a brace inside a food name is never counted.
+ *
+ * It only ever INSERTS structural characters. No value is altered, invented or
+ * dropped — a repaired document contains exactly the data the model sent. A
+ * genuinely truncated response is a different failure and is caught earlier,
+ * by the stop_reason check in callClaude, so this is never papering over
+ * missing data.
+ */
+const repairBrackets = (text: string): string => {
+  const closerFor: Record<string, string> = { '{': '}', '[': ']' };
+  const openerFor: Record<string, string> = { '}': '{', ']': '[' };
+
+  const stack: string[] = [];
+  let out = '';
+  let inString = false;
+  let escaped = false;
+
+  for (const ch of text) {
+    if (escaped) { out += ch; escaped = false; continue; }
+    if (inString && ch === '\\') { out += ch; escaped = true; continue; }
+    if (ch === '"') { inString = !inString; out += ch; continue; }
+    if (inString) { out += ch; continue; }
+
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+      out += ch;
+    } else if (ch === '}' || ch === ']') {
+      // Unwind anything still open that this closer does not match.
+      while (stack.length > 0 && stack[stack.length - 1] !== openerFor[ch]) {
+        out += closerFor[stack.pop() as string];
+      }
+      if (stack.length > 0) { stack.pop(); out += ch; }
+      // A closer with nothing open is stray; drop it rather than corrupt.
+    } else {
+      out += ch;
+    }
+  }
+
+  if (inString) out += '"';
+  while (stack.length > 0) out += closerFor[stack.pop() as string];
+  return out;
 };
 
 export const parseJsonResponse = (raw: string) => {
@@ -87,9 +155,16 @@ export const parseJsonResponse = (raw: string) => {
   try {
     return JSON.parse(clean);
   } catch {
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No valid JSON found in response');
-    return JSON.parse(match[0]);
+    // Repair before the greedy fallback: an unbalanced document still holds
+    // all of its data, whereas the regex discards whatever follows the last
+    // brace and would silently drop ingredients.
+    try {
+      return JSON.parse(repairBrackets(clean));
+    } catch {
+      const match = clean.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No valid JSON found in response');
+      return JSON.parse(match[0]);
+    }
   }
 };
 
@@ -287,15 +362,23 @@ For each food:
 
 Return ONLY JSON using EXACTLY these micro key names:
 {"foods":[{"name":"...","unit":"...","quantity":1,"perUnit":{"calories":0,"protein":0,"carbs":0,"fat":0,"micros":{"Fiber":0,"Sugar":0,"Vitamin A":0,"Vitamin C":0,"Vitamin D":0,"Vitamin E":0,"Vitamin K":0,"Thiamin":0,"Riboflavin":0,"Niacin":0,"Vitamin B6":0,"Folate":0,"Vitamin B12":0,"Biotin":0,"Pantothenic Acid":0,"Choline":0,"Calcium":0,"Iron":0,"Magnesium":0,"Phosphorus":0,"Potassium":0,"Sodium":0,"Zinc":0,"Copper":0,"Manganese":0,"Selenium":0,"Iodine":0,"Omega-3":0}}}]}
-Units: Vitamin A/D/K/Folate/B12/Biotin/Selenium/Iodine in mcg; other vitamins and minerals in mg; Omega-3 in g. Estimate from USDA rather than returning 0 where a reasonable value exists. All numbers, no strings.`;
+Units: Vitamin A/D/K/Folate/B12/Biotin/Selenium/Iodine in mcg; other vitamins and minerals in mg; Omega-3 in g. Estimate from USDA rather than returning 0 where a reasonable value exists. All numbers, no strings.
+
+OUTPUT SIZE MATTERS: return MINIFIED JSON on a single line — no newlines, no indentation, no spaces after colons or commas. OMIT any micronutrient whose value would be 0 rather than listing it; a missing key is read as zero. A long ingredient list that exceeds the response limit is truncated and lost entirely, so be compact.`;
 
   // NOTE: this deliberately throws rather than returning [] — the caller needs
   // to distinguish "no food found" from "the request failed" so it can tell the
   // user instead of silently closing the form.
+  // One food costs roughly 200 output tokens minified. Budget per line of
+  // input, with headroom, and stop at the proxy's 4096 output clamp — that
+  // limit bounds abuse cost and is not worth weakening for a long recipe.
+  const lines = input.split('\n').filter(l => l.trim()).length || 1;
+  const budget = Math.min(4096, Math.max(1500, 600 + lines * 320));
+
   const raw = await callClaude(
-    'Precise nutrition database. Report per-unit values only; never multiply. Return only JSON.',
+    'Precise nutrition database. Report per-unit values only; never multiply. Return only minified JSON.',
     prompt,
-    2500,
+    budget,
     MODEL_FAST
   );
   const data = parseJsonResponse(raw);

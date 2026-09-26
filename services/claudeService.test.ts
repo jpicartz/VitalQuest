@@ -301,3 +301,54 @@ describe('generateNutritionInsights — hostile model output', () => {
     expect(out.patterns).toEqual(['real']);
   });
 });
+
+describe('parseJsonResponse — structurally broken documents', () => {
+  // All of these come from one real failure: a seven-ingredient recipe that
+  // came back with every ingredient and value intact but 22 opening braces to
+  // 20 closing ones — the array was closed before two objects inside it were.
+  // The user saw "Could not reach the nutrition service".
+
+  it('recovers when the array closes before the objects inside it', () => {
+    // The exact shape of the real break: last food never closed, yet ] and
+    // the root brace still arrived.
+    const broken = '{"foods":[{"name":"Egg","perUnit":{"calories":70}},{"name":"Salt","perUnit":{"calories":0]';
+    const out = parseJsonResponse(broken);
+    expect(out.foods).toHaveLength(2);
+    expect(out.foods[1].name).toBe('Salt');
+    expect(out.foods[1].perUnit.calories).toBe(0);
+  });
+
+  it('keeps every ingredient rather than dropping the tail', () => {
+    // The greedy-regex fallback would cut at the last brace and lose foods.
+    const broken = '{"foods":[{"name":"A"},{"name":"B"},{"name":"C"}';
+    expect(parseJsonResponse(broken).foods.map((f: { name: string }) => f.name))
+      .toEqual(['A', 'B', 'C']);
+  });
+
+  it('closes a missing root brace', () => {
+    const out = parseJsonResponse('{"foods":[{"name":"Egg","perUnit":{"calories":70}}]');
+    expect(out.foods).toHaveLength(1);
+  });
+
+  it('closes several levels at once', () => {
+    expect(parseJsonResponse('{"foods":[{"name":"Egg","perUnit":{"calories":70').foods[0].perUnit.calories).toBe(70);
+  });
+
+  it('does not count braces inside a string', () => {
+    const out = parseJsonResponse('{"foods":[{"name":"Rice {jasmine}","perUnit":{"calories":200}}]');
+    expect(out.foods[0].name).toBe('Rice {jasmine}');
+  });
+
+  it('handles an escaped quote before the break', () => {
+    const out = parseJsonResponse('{"foods":[{"name":"6\\" sub","perUnit":{"calories":300}}]');
+    expect(out.foods[0].name).toBe('6" sub');
+  });
+
+  it('leaves well-formed JSON untouched', () => {
+    expect(parseJsonResponse('{"a":1,"b":[2,3]}')).toEqual({ a: 1, b: [2, 3] });
+  });
+
+  it('still rejects something that is not JSON at all', () => {
+    expect(() => parseJsonResponse('the model apologised instead')).toThrow(/No valid JSON/);
+  });
+});

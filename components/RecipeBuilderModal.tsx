@@ -58,10 +58,16 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
         return;
       }
       setParsed(items);
-    } catch {
+    } catch (err) {
       // parseFoodLog throws rather than returning [] precisely so this case can
-      // be told apart from "nothing recognised".
-      setError('Could not reach the nutrition service. Your ingredients are still here — try again.');
+      // be told apart from "nothing recognised" — so show WHAT went wrong.
+      // A blanket "could not reach the service" hid a truncated response behind
+      // a network error and left the user with nothing to act on.
+      setError(
+        err instanceof Error
+          ? `${err.message} Your ingredients are still here.`
+          : 'Something went wrong. Your ingredients are still here — try again.'
+      );
     } finally {
       setIsParsing(false);
     }

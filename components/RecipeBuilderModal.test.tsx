@@ -93,14 +93,21 @@ describe('building a recipe', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/identify any ingredients/i);
   });
 
-  it('distinguishes a failed request from an unrecognised one, and keeps the input', async () => {
-    // parseFoodLog throws rather than returning [] precisely so these differ.
-    vi.mocked(parseFoodLog).mockRejectedValue(new Error('network'));
+  it('shows WHAT went wrong, not a generic failure, and keeps the input', async () => {
+    // The real bug this covers: a truncated response threw "Unterminated
+    // string...", which the UI reported as "could not reach the service" —
+    // wrong and unactionable. The thrown message must reach the user.
+    vi.mocked(parseFoodLog).mockRejectedValue(
+      new Error('That was too much to process in one go — the response was cut off. Try splitting it into fewer items.'),
+    );
     const { user } = render();
     await user.type(screen.getByLabelText(/Recipe name/), 'Brownies');
     await user.type(screen.getByLabelText(/went into the batch/), '200g whey');
     await user.click(screen.getByRole('button', { name: /Analyse/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Could not reach/i);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/too much to process/i);
+    expect(alert).toHaveTextContent(/ingredients are still here/i);
     expect((screen.getByLabelText(/went into the batch/) as HTMLTextAreaElement).value).toBe('200g whey');
   });
 });
