@@ -142,8 +142,35 @@ describe('originAllowed', () => {
     expect(originAllowed('https://vital-quest-rho.vercel.app')).toBe(true);
   });
 
-  it('accepts Vercel preview subdomains', () => {
-    expect(originAllowed('https://vital-quest-git-feature-abc.vercel.app')).toBe(true);
+  it('accepts a Vercel preview calling its own host', () => {
+    // A real preview deployment's Origin and Host are the same deployment.
+    expect(
+      originAllowed(
+        'https://vital-quest-git-feature-abc.vercel.app',
+        'vital-quest-git-feature-abc.vercel.app',
+      ),
+    ).toBe(true);
+  });
+
+  /*
+    The regression this function exists for.
+
+    `vercel.app` subdomains are first-come across all of Vercel, so a stranger
+    could deploy a project landing on a `vital-quest`-prefixed name. Under the
+    old pattern match its Origin passed and it could spend our API budget.
+    Calling OUR host from THEIR origin must be refused.
+  */
+  it('rejects a lookalike Vercel subdomain calling our host', () => {
+    expect(
+      originAllowed('https://vital-quest-abuse.vercel.app', 'vital-quest-rho.vercel.app'),
+    ).toBe(false);
+    expect(
+      originAllowed('https://vital-quest.vercel.app', 'vital-quest-rho.vercel.app'),
+    ).toBe(false);
+  });
+
+  it('rejects a preview-looking origin when no host is supplied', () => {
+    expect(originAllowed('https://vital-quest-git-feature-abc.vercel.app')).toBe(false);
   });
 
   it('rejects http even on an allowed host', () => {

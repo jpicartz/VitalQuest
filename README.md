@@ -114,7 +114,7 @@ npm run test:run   # vitest, single run (what CI runs)
 
 ## Tests
 
-494 tests, run on every push by [CI](.github/workflows/ci.yml) alongside typecheck and build. Two Vitest projects: pure logic in a fast `node` environment, component tests in `jsdom` with Testing Library.
+569 tests, run on every push by [CI](.github/workflows/ci.yml) alongside typecheck and build. Two Vitest projects: pure logic in a fast `node` environment, component tests in `jsdom` with Testing Library.
 
 | Area | What's covered |
 |---|---|

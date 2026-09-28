@@ -30,14 +30,30 @@ const ALLOWED_ORIGINS = new Set([
   'https://vital-quest-rho.vercel.app',
 ]);
 
-// Vercel branch/preview deployments get generated subdomains, which would
-// otherwise 403 on every AI call and make the preview look broken.
-export function originAllowed(origin: string): boolean {
+/*
+  Vercel branch/preview deployments get generated subdomains, which would
+  otherwise 403 on every AI call and make the preview look broken.
+
+  They are admitted by comparing the Origin against the Host being called, NOT
+  by pattern-matching the name. This previously matched
+  `vital-quest[a-z0-9-]*.vercel.app`, and `vercel.app` subdomains are
+  first-come across all of Vercel: anyone who deployed a project landing on
+  `vital-quest-abuse.vercel.app` would have had an Origin that passed, and
+  could have driven this proxy against our Anthropic key. The per-instance
+  rate limiter was the only thing behind it, and it is a speed bump rather
+  than a cap.
+
+  The same-host check loses nothing. A real preview deployment calls its OWN
+  host, so its Origin and Host match and it is allowed. The wildcard only ever
+  admitted origins that were NOT this deployment — exactly the set to refuse.
+*/
+export function originAllowed(origin: string, host?: string): boolean {
   if (ALLOWED_ORIGINS.has(origin)) return true;
   try {
     const { hostname, protocol } = new URL(origin);
     if (protocol !== 'https:') return false;
-    return /^vital-quest[a-z0-9-]*\.vercel\.app$/.test(hostname);
+    // Host can carry a port; Origin's hostname never does.
+    return Boolean(host) && hostname === host!.split(':')[0];
   } catch {
     return false;
   }
@@ -130,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Soft same-origin check: block browser cross-site abuse. A missing Origin
   // (server-to-server) is allowed here and handled by the rate limit below.
   const origin = req.headers.origin;
-  if (origin && !originAllowed(origin)) {
+  if (origin && !originAllowed(origin, req.headers.host)) {
     return res.status(403).json({ error: 'Forbidden origin' });
   }
 
