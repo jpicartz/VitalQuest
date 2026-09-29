@@ -96,10 +96,10 @@ cd VitalQuest
 npm install
 ```
 
-Create `.env.local`:
+Create `.env.local` from the documented template:
 
 ```bash
-VITE_ANTHROPIC_API_KEY=sk-ant-your-key-here
+cp .env.example .env.local   # then fill in your key
 ```
 
 > In development the browser calls Anthropic directly using this key so you don't need a serverless runtime. In production that branch is stripped from the bundle and all traffic goes through `/api/claude` using the server-side `ANTHROPIC_API_KEY` environment variable.
