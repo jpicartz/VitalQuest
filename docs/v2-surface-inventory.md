@@ -1,8 +1,15 @@
-# v2 Surface Inventory
+# v2 Surface Inventory — record of the navigation restructure
 
-Every reachable surface in v1, and where it lands in v2. **Nothing moves until this
-file is complete**, because a dropped surface produces no error, no failing test,
-and no visual glitch — the only thing that catches one is walking this list.
+*Completed. Kept as a record of how the restructure was done and what it caught.*
+
+When VitalQuest went from seven navigation targets to four, this file was written
+**before** anything moved: every reachable surface in v1, mapped to where it would
+land in v2 or marked as a deliberate cut.
+
+The reason for writing it first is the whole point of the document — **a dropped
+surface produces no error, no failing test, and no visual glitch.** Nothing catches
+one except walking the list against the running app. One surface was dropped
+anyway; the walk is what found it (see *Result of the walk* at the end).
 
 **v1:** 4 tabs + 3 sub-tabs = 7 navigation targets.
 **v2:** 4 tabs + a profile sheet.

@@ -30,7 +30,7 @@ Four destinations, each answering one question.
 
 | | |
 |---|---|
-| **Today** · *what did I eat?* | Type "2 eggs and a slice of toast" — or say it — and Claude parses it into calories, macros and 28 micronutrients against USDA values. Water, sunlight, favourites and a meal builder live here too. |
+| **Today** · *what did I eat?* | Type "2 eggs and a slice of toast" — or say it — and Claude parses it into calories, macros and 28 micronutrients against USDA values. Water, sunlight, favourites, a meal builder and your **saved recipes** live here too. |
 | **Body** · *what did it do?* | Seven body systems scored on how well today's intake supports them: hair & nails, skin, muscle, hormonal, energy, immune, bone. Because they share nutrients, the tab leads with the one gap holding the most of them back. |
 | **Goal** · *where am I heading?* | A target weight and date turn into today's calorie and protein numbers, plus an on/off-track verdict. Daily quests, weight and exercise logging, and trend charts sit alongside. |
 | **Coach** · *why?* | A scoped AI coach anchored to a real finding from your day, not a blank chat box. |
@@ -45,13 +45,19 @@ The seven scores are computed in `utils/bodySystems.ts` — pure, deterministic,
 
 Because the systems overlap (vitamin D feeds hair, muscle, hormones and bone; zinc feeds hair, skin and hormones), one shortfall usually drags several scores down at once. `computeLimitingNutrients()` finds those shared constraints, which is what turns a dashboard into an instruction.
 
+### Recipes: bake once, log a slice
+
+List everything that went into a batch, say how many servings it makes, and the app works out one serving — with the same 28 micronutrients any other food gets, because it reuses the same parsing path.
+
+The arithmetic is deliberately **not** the model's job. It is asked only what each ingredient contains; summing the batch and dividing by servings happens in `utils/recipes.ts`. That is a lesson this codebase paid for once: told to scale "5 eggs", a model overshot by 4×. A bad divisor would be worse, because it would ride along on every future log of that recipe.
+
 ### Goals refuse unsafe targets
 
 The eating-disorder guardrails live in `utils/goalProjection.ts` as pure functions — **not in a prompt**. Targets below a healthy BMI, trajectories faster than ~1% of bodyweight per week, and deficits that push intake under 1200 kcal are refused outright, with a safe alternative offered where one exists. The coach inherits a system that already refuses, and adds a second client-side intent screen that runs *before* any network call. A calorie tracker with an AI coach has real exposure here, and a prompt is the weakest possible place for the highest-severity rule.
 
 ### Also
 
-Natural-language and **voice** food logging · XP, levels, daily quests and 8 badges · water, sunlight, weight and exercise tracking · PDF export · light and dark themes, both tuned to WCAG AA.
+Natural-language and **voice** food logging · weights in **kg or lbs** (stored in kg, converted only at the edges) · XP, levels, daily quests and 8 badges · water, sunlight, weight and exercise tracking · PDF export · light and dark themes, both tuned to WCAG AA.
 
 ## Tech stack
 
