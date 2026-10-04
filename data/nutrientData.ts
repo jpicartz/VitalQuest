@@ -31,6 +31,9 @@ export const NUTRIENT_INFO: Record<string, NutrientEducation> = {
     description: "Simple carbs. Natural sugars (fruit) come with fiber; added sugars should be minimized.",
     sources: ["Fruit (Natural)", "Candy (Added)", "Soda (Added)"],
     caution: "High intake linked to inflammation and metabolic issues.",
+    // Every other nutrient has a dailyValue; Sugar did not, so the detail sheet
+    // rendered an empty target for it.
+    dailyValue: "<50g",
     targetVal: 50,
     unit: "g",
     direction: 'ceiling',

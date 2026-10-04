@@ -5,6 +5,7 @@ import { NutritionTracker } from './NutritionTracker';
 import { aMealLog, aFood, aWeightEntry, TODAY } from '../test/fixtures';
 import { renderWithApp, AppOverrides } from '../test/renderWithApp';
 import { addDaysISO } from '../utils/dateUtils';
+import { MICRO_KEYS, NUTRIENT_INFO } from '../data/nutrientData';
 
 /**
  * Smoke tests for the CURRENT (v1) sub-tab structure: Food Log / Trends / Analysis.
@@ -196,6 +197,74 @@ describe('NutritionTracker — Trends surfaces', () => {
     );
     for (const key of ['Fiber', 'Vitamin C', 'Iron', 'Omega-3']) {
       expect(snapshot.getByText(key), `missing snapshot row: ${key}`).toBeInTheDocument();
+    }
+  });
+});
+
+describe('a ceiling nutrient is never presented as a goal', () => {
+  /** A day well over both ceilings and short on everything else. */
+  const saltyDay: AppOverrides = {
+    foodLogs: [aMealLog({
+      food: aFood({
+        name: 'Instant ramen and a soda',
+        calories: 700, protein: 12, carbs: 110, fat: 20,
+        micros: { Sodium: 3450, Sugar: 75, Potassium: 200 },
+      }),
+    })],
+  };
+
+  it('labels sodium as a share of its limit, not as % DV', () => {
+    renderWithApp(<NutritionTracker view="analysis" />, saltyDay);
+    const tile = screen.getByTitle('Sodium').closest('button')!;
+    // 3450 of 2300 = 150%. The number is right either way; the words are what
+    // told the user whether that is good or bad.
+    expect(within(tile).getByText(/150% of limit/)).toBeInTheDocument();
+    expect(within(tile).queryByText(/150% DV/)).not.toBeInTheDocument();
+  });
+
+  it('shows sugar at all — it is tracked, so it must be visible', () => {
+    renderWithApp(<NutritionTracker view="analysis" />, saltyDay);
+    const tile = screen.getByTitle('Sugar').closest('button')!;
+    expect(within(tile).getByText(/150% of limit/)).toBeInTheDocument();
+  });
+
+  it('still reads % DV for an ordinary goal nutrient', () => {
+    renderWithApp(<NutritionTracker view="analysis" />, saltyDay);
+    const tile = screen.getByTitle('Potassium').closest('button')!;
+    expect(within(tile).getByText(/6% DV/)).toBeInTheDocument();
+  });
+
+  it('calls the ceiling a limit in the detail sheet, and does not suggest eating it', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<NutritionTracker view="analysis" />, saltyDay);
+    await user.click(screen.getByTitle('Sodium').closest('button')!);
+
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).getByText('Daily Limit')).toBeInTheDocument();
+    expect(within(sheet).queryByText('Daily Target')).not.toBeInTheDocument();
+    // "Suggested Food Sources: Table Salt, Processed Foods, Pickles" was the
+    // app recommending salt in order to reach a limit.
+    expect(within(sheet).queryByText('Suggested Food Sources')).not.toBeInTheDocument();
+    expect(within(sheet).getByText('Common Sources')).toBeInTheDocument();
+    // The honest data was always there; it must still be shown.
+    expect(within(sheet).getByText(/<2300mg/)).toBeInTheDocument();
+    expect(within(sheet).getByText(/Limit intake/)).toBeInTheDocument();
+  });
+
+  it('keeps suggesting sources for a nutrient you should get more of', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<NutritionTracker view="analysis" />, saltyDay);
+    await user.click(screen.getByTitle('Iron').closest('button')!);
+
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).getByText('Daily Target')).toBeInTheDocument();
+    expect(within(sheet).getByText('Suggested Food Sources')).toBeInTheDocument();
+  });
+
+  it('gives every tracked nutrient a stated daily value in the sheet', () => {
+    // Sugar had no dailyValue, so its sheet showed an empty target.
+    for (const k of MICRO_KEYS) {
+      expect(NUTRIENT_INFO[k].dailyValue, `${k} has no dailyValue`).toBeTruthy();
     }
   });
 });

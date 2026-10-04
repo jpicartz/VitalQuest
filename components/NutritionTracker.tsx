@@ -9,7 +9,7 @@ import { Field } from './ui/Field';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
 import { MetricChipRail, metricsFromFood, metricsFromWater, type Metric } from './ui/MetricChip';
-import { NUTRIENT_INFO } from '../data/nutrientData';
+import { NUTRIENT_INFO, MICRO_KEYS } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
 import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, sumMacros, scoreFromConsumed, weightOnDate, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
@@ -917,15 +917,32 @@ const isViewingToday = selectedDate === toISODateString();
 
            <Card title="Micronutrient Breakdown">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                 {Object.keys(NUTRIENT_INFO).filter(k => !['Protein','Carbohydrates','Fats','Fiber','Sugar'].includes(k)).map(key => {
+                 {/* Fiber is excluded because it has its own progress bar above,
+                     with the macros where it belongs — not because it is
+                     untracked. Sugar and Sodium ARE here: both are ceilings, and
+                     a tracked nutrient the user is never shown is the same
+                     collected-but-unused problem as any other. */}
+                 {MICRO_KEYS.filter(k => k !== 'Fiber').map(key => {
                     const amount = Number(consumedMicros[key] || 0);
                     const info = NUTRIENT_INFO[key];
                     const target = info.targetVal;
+                    const pct = target ? Math.round((amount / target) * 100) : 0;
+                    // A ceiling is not a goal. Sodium at 150% means 50% OVER the
+                    // limit, and rendering that as "150% DV" in success-green
+                    // told the user they were doing well at the exact moment
+                    // they should ease off. Ceilings read as "of limit", and
+                    // turn warning-coloured once exceeded.
+                    const isCeiling = info.direction === 'ceiling';
+                    const over = isCeiling && pct > 100;
                     return (
                       <button key={key} onClick={() => setSelectedNutrient(key)} className="p-4 rounded-tile border border-edge bg-raised flex flex-col justify-between hover:border-nutri text-left transition-all active:scale-[0.98]">
                          <div className="text-[10px] font-semibold text-fg-mute uppercase truncate" title={key}>{key}</div>
                          <div className="nums text-lg font-bold text-fg">{amount > 0 ? Math.round(amount * 10) / 10 : '-'}<span className="text-xs font-normal text-fg-soft ml-1">{info.unit}</span></div>
-                         {target && amount > 0 && <div className="nums text-[10px] font-bold text-nutri mt-1">{Math.round((amount / target) * 100)}% DV</div>}
+                         {target && amount > 0 && (
+                           <div className={`nums text-[10px] font-bold mt-1 ${over ? 'text-fat' : 'text-nutri'}`}>
+                             {pct}%{isCeiling ? ' of limit' : ' DV'}
+                           </div>
+                         )}
                       </button>
                     )
                  })}
@@ -1024,21 +1041,44 @@ const isViewingToday = selectedDate === toISODateString();
             <div className="space-y-6">
               <p className="text-fg-soft leading-relaxed text-sm">{NUTRIENT_INFO[selectedNutrient].description}</p>
 
-              <div className="flex justify-between items-center bg-nutri/10 p-4 rounded-control">
-                 <span className="font-bold text-nutri text-sm">Daily Target</span>
-                 <span className="nums font-bold text-xl text-nutri">{NUTRIENT_INFO[selectedNutrient].dailyValue}</span>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-semibold text-fg-mute uppercase tracking-widest mb-3">Suggested Food Sources</h4>
-                <div className="flex flex-wrap gap-2">
-                  {NUTRIENT_INFO[selectedNutrient].sources.map((source, idx) => (
-                    <div key={idx} className="bg-raised text-fg px-3 py-2 rounded-control text-sm font-semibold border border-edge">
-                      {source}
+              {/* A ceiling is a limit, not something to reach. Labelling Sodium
+                  "Daily Target" in success-green and then listing "Suggested
+                  Food Sources: Table Salt, Processed Foods, Pickles" told the
+                  user to eat more salt to hit it. The underlying data was always
+                  honest — the description, the caution and the "<2300mg" are all
+                  correct — it was the framing around it that inverted them. */}
+              {(() => {
+                const info = NUTRIENT_INFO[selectedNutrient];
+                const isCeiling = info.direction === 'ceiling';
+                return (
+                  <>
+                    <div className={`flex justify-between items-center p-4 rounded-control ${isCeiling ? 'bg-spark/10' : 'bg-nutri/10'}`}>
+                       <span className={`font-bold text-sm ${isCeiling ? 'text-spark' : 'text-nutri'}`}>
+                         {isCeiling ? 'Daily Limit' : 'Daily Target'}
+                       </span>
+                       <span className={`nums font-bold text-xl ${isCeiling ? 'text-spark' : 'text-nutri'}`}>{info.dailyValue}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
+
+                    <div>
+                      <h4 className="text-xs font-semibold text-fg-mute uppercase tracking-widest mb-3">
+                        {isCeiling ? 'Common Sources' : 'Suggested Food Sources'}
+                      </h4>
+                      {isCeiling && (
+                        <p className="text-xs text-fg-soft mb-3">
+                          Where this usually comes from — worth watching rather than seeking out.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {info.sources.map((source, idx) => (
+                          <div key={idx} className="bg-raised text-fg px-3 py-2 rounded-control text-sm font-semibold border border-edge">
+                            {source}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
               {NUTRIENT_INFO[selectedNutrient].caution && (
                 <div className="bg-spark/10 p-3 rounded-control text-[11px] text-fg-soft leading-tight">
