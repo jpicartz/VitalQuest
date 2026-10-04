@@ -546,3 +546,77 @@ describe('parseFoodLog guarantees a complete nutrient shape', () => {
     expect(food.micros![MICRO_KEYS[0]]).toBe(2); // 1 x 2
   });
 });
+
+describe('parseFoodLog survives a transient bad response', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const complete = {
+    foods: [{
+      name: 'Almonds', unit: '100g', quantity: 1,
+      perUnit: {
+        calories: 579, protein: 21, carbs: 22, fat: 50,
+        micros: Object.fromEntries(MICRO_KEYS.map((k, i) => [k, i + 1])),
+      },
+    }],
+  };
+
+  /** Each entry is one call's raw text; non-JSON stands in for a bad response. */
+  const withRawResponses = (...texts: string[]) => {
+    const fetchMock = vi.fn();
+    for (const text of texts) {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ content: [{ type: 'text', text }], stop_reason: 'end_turn' }),
+      });
+    }
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  // A real malformed body seen from the model: an unquoted property name.
+  const MALFORMED = '{"foods":[{"name":"Salmon",unit:"1 fillet","quantity":1}]}';
+
+  it('retries once when the first response will not parse', async () => {
+    const fetchMock = withRawResponses(MALFORMED, JSON.stringify(complete));
+    const foods = await parseFoodLog('100g almonds');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(foods[0].name).toBe('Almonds');
+  });
+
+  it('throws a readable message when both attempts are unparseable', async () => {
+    withRawResponses(MALFORMED, MALFORMED);
+    // Not "Expected double-quoted property name in JSON at position 550".
+    await expect(parseFoodLog('100g almonds')).rejects.toThrow(/unreadable, twice/);
+  });
+
+  it('keeps a usable first attempt when the retry fails', async () => {
+    // First attempt parses but is thin, triggering the completeness retry;
+    // the retry then fails. The thin-but-real data must survive.
+    const thin = {
+      foods: [{
+        name: 'Almonds', unit: '100g', quantity: 1,
+        perUnit: { calories: 579, protein: 21, carbs: 22, fat: 50, micros: { Biotin: 45 } },
+      }],
+    };
+    const fetchMock = withRawResponses(JSON.stringify(thin), MALFORMED);
+    const foods = await parseFoodLog('100g almonds');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(foods[0].micros!.Biotin).toBe(45);
+  });
+});
+
+describe('the prompt does not send the model to USDA for nutrients USDA lacks', () => {
+  const source = readFileSync(new URL('./claudeService.ts', import.meta.url), 'utf8');
+
+  it('names Biotin and Iodine as gaps instead of asking for a USDA estimate', () => {
+    // "Estimate from USDA" plus "use 0 only when the food genuinely contains
+    // none" made the model return Biotin 0 for almonds - one of the richest
+    // biotin foods there is - because USDA's tables carry no biotin figure.
+    expect(source).toMatch(/do NOT contain Biotin or Iodine/i);
+    expect(source).toMatch(/almonds ~45mcg/);
+  });
+
+  it('still points at USDA for everything else', () => {
+    expect(source).toMatch(/For every other nutrient, estimate from USDA/i);
+  });
+});

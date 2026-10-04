@@ -435,6 +435,21 @@ const worstMicroCount = (foods: ParsedFood[]): number =>
 /** Below 75% of the 28 keys, the response is treated as materially incomplete. */
 const MIN_REPORTED_MICROS = 21;
 
+/**
+ * Biotin and Iodine are not in USDA's standard reference tables.
+ *
+ * This is why "5 eggs" worked while "100g almonds" returned Biotin 0: the
+ * prompt said to estimate from USDA, USDA carries no biotin figure for almonds,
+ * so the model correctly followed the instruction and returned 0 — and the app
+ * told the user they had eaten none of one of the richest biotin foods there is.
+ * Iodine failed the same way.
+ *
+ * Naming the two gaps and anchoring them with reference values is the fix.
+ * Anchors are per 100g unless stated, drawn from published food-composition
+ * data rather than USDA SR.
+ */
+const USDA_GAP_RULE = `USDA's standard tables do NOT contain Biotin or Iodine. Do not return 0 for those two merely because USDA lacks a figure — estimate them from published food-composition data. Anchors: biotin per 100g — almonds ~45mcg, peanuts ~35mcg, egg ~20mcg (about 10mcg per large egg), salmon ~5mcg, avocado ~4mcg, sweet potato ~2mcg, most meat 1-5mcg, most fruit/vegetables 0.5-2mcg; iodine — dairy ~15mcg/100g, eggs ~25mcg/100g, white fish ~100mcg/100g, seaweed very high, iodised salt ~2000mcg/100g, most other foods under 3mcg. For every other nutrient, estimate from USDA. Use 0 only when the food genuinely contains none.`;
+
 export const parseFoodLog = async (input: string): Promise<FoodItem[]> => {
   const prompt = `Identify each food in this description and report its nutrition PER SINGLE UNIT, plus how many units the user had. Do NOT multiply — the app does that.
 
@@ -447,11 +462,13 @@ For each food:
 
 Return ONLY JSON using EXACTLY these micro key names:
 {"foods":[{"name":"...","unit":"...","quantity":1,"perUnit":{"calories":0,"protein":0,"carbs":0,"fat":0,"micros":${MICRO_SKELETON}}}]}
-Units — use EXACTLY these, they are what the app scores against: ${UNIT_DECLARATION}. Vitamin A as mcg RAE and Vitamin D as mcg cholecalciferol — NOT IU; Vitamin E as mg alpha-tocopherol. Estimate from USDA rather than returning 0 where a reasonable value exists. All numbers, no strings.
+Units — use EXACTLY these, they are what the app scores against: ${UNIT_DECLARATION}. Vitamin A as mcg RAE and Vitamin D as mcg cholecalciferol — NOT IU; Vitamin E as mg alpha-tocopherol. All numbers, no strings.
 
 OUTPUT SIZE MATTERS: return MINIFIED JSON on a single line — no newlines, no indentation, no spaces after colons or commas.
 
-INCLUDE EVERY MICRONUTRIENT KEY LISTED ABOVE for every food, even when the value is small or zero. A missing key is read as zero by the app, so omitting one silently under-reports that nutrient — eggs without "Biotin" means the user is told they ate none. Estimate from USDA; use 0 only when the food genuinely contains none.`;
+INCLUDE EVERY MICRONUTRIENT KEY LISTED ABOVE for every food, even when the value is small or zero. A missing key is read as zero by the app, so omitting one silently under-reports that nutrient — eggs without "Biotin" means the user is told they ate none.
+
+${USDA_GAP_RULE}`;
 
   // NOTE: this deliberately throws rather than returning [] — the caller needs
   // to distinguish "no food found" from "the request failed" so it can tell the
@@ -477,7 +494,19 @@ INCLUDE EVERY MICRONUTRIENT KEY LISTED ABOVE for every food, even when the value
     return (parseJsonResponse(raw).foods || []) as ParsedFood[];
   };
 
-  let foods = await requestFoods();
+  // The model occasionally emits malformed JSON — an unquoted key or a stray
+  // comma, at a different position each time, on an input that parses cleanly
+  // on the next attempt. parseJsonResponse already repairs what it can; what it
+  // cannot repair used to reach the user as a raw SyntaxError ("Expected
+  // double-quoted property name in JSON at position 550"), losing a whole meal
+  // to a transient glitch.
+  let foods: ParsedFood[] = [];
+  let firstError: unknown = null;
+  try {
+    foods = await requestFoods();
+  } catch (error) {
+    firstError = error;
+  }
 
   // The prompt insists on all 28 micro keys, and compliance is NOT reliable:
   // the same request came back with 28 of 28 per food on one call and roughly
@@ -490,12 +519,25 @@ INCLUDE EVERY MICRONUTRIENT KEY LISTED ABOVE for every food, even when the value
   // costs a fraction of a cent, which is far below the cost of a wrong number
   // in a health app. A small shortfall is accepted rather than retried, because
   // retrying on one missing trace value would double the cost of every parse.
-  if (foods.length && foods.some(f => reportedMicroCount(f) < MIN_REPORTED_MICROS)) {
-    const retry = await requestFoods();
-    // Keep whichever attempt reported more. A retry can come back worse, and
-    // blindly preferring the second attempt would sometimes throw away the
-    // better answer.
-    if (worstMicroCount(retry) > worstMicroCount(foods)) foods = retry;
+  const incomplete =
+    foods.length > 0 && foods.some(f => reportedMicroCount(f) < MIN_REPORTED_MICROS);
+
+  if (firstError || incomplete) {
+    try {
+      const retry = await requestFoods();
+      // After a failed first attempt anything parseable wins. Otherwise keep
+      // whichever reported more: a retry can come back worse, and blindly
+      // preferring the second attempt would throw away the better answer.
+      if (firstError || worstMicroCount(retry) > worstMicroCount(foods)) foods = retry;
+    } catch (retryError) {
+      // Only fatal if there is no usable first attempt to fall back on.
+      if (firstError) {
+        console.error('parseFoodLog failed twice:', firstError, retryError);
+        throw new Error(
+          "The nutrition service returned something unreadable, twice. Try rewording that, or splitting it into fewer items.",
+        );
+      }
+    }
   }
 
   return foods.map((f: ParsedFood, i: number) =>
