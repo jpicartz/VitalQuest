@@ -195,3 +195,77 @@ can see. Rewriting them in the same commit as the code destroys that evidence.
   passed only because its fixture arranged the data that way; real data
   disproved it immediately. It manufactured confidence. It is now scoped to the
   guarantee that actually holds.
+
+---
+
+## 11. The prompt's nutrient list is generated from the reference data
+
+**Decision.** `MICRO_KEYS` is exported from `data/nutrientData.ts`, and the parse
+prompt's JSON skeleton and its unit declaration are both built from it at module
+load. Neither is written out by hand.
+
+**Why.** They drifted. `NUTRIENT_INFO` scored Copper in mcg against a 900 target
+while the prompt's mcg list omitted it, so the model returned mg — about 0.9 for
+a normal day — and the app displayed 0.1% DV. It is the worst shape a bug can
+take in this app: not a crash, not a blank, but a plausible small number that
+reads as "you are deficient in copper" every single day. A hand-written copy of
+a list in a prompt is a second source of truth, and this one was wrong for as
+long as nobody multiplied it out.
+
+Copper is now stored in **mg with a 0.9 target** — the same RDA as 900 mcg —
+rather than forcing the unit in the prompt, because the model returns mg for
+copper regardless of what it is told. USDA tables use mg and that prior wins.
+**Match the model where it is reliably consistent; constrain it in code where it
+is not.**
+
+**Reverse this if** a nutrient needs a unit the model will not produce. Then the
+conversion belongs in `normalizeMicros`, in code, next to the other coercions —
+not in the prompt.
+
+---
+
+## 12. Model compliance is measured, not assumed
+
+**Decision.** `normalizeMicros` fills every tracked nutrient at 0, so a food
+always carries all 28 keys. `parseFoodLog` then counts how many the model
+actually reported and retries once when a food comes back below 75% of them,
+keeping whichever attempt reported more.
+
+**Why.** The prompt instructs the model to return every key, and compliance is
+unreliable in a way that only shows up on repeated calls: the same request came
+back 28 of 28 per food on one call and roughly half on the next. A dropped key
+is invisible — it is indistinguishable in the UI from a food that genuinely
+contains none of that nutrient, so the user is simply told they ate no vitamin D.
+
+This is §1 applied to a case where the rule is easy to miss, because the prompt
+*looks* like it is handling it. An instruction in a prompt is a request. The
+guarantee has to be in code.
+
+Two limits, stated rather than papered over:
+
+- **The fill cannot recover an omitted value.** It guarantees the shape, not the
+  number, which is why the prompt still insists on every key and why the retry
+  exists at all.
+- **The retry threshold is a cost trade.** Retrying on one missing trace value
+  would double the cost of every parse. 75% catches "half the vitamins vanished"
+  and ignores a single absent nutrient.
+
+**An earlier instruction caused this.** The prompt once said to *omit* any
+nutrient whose value would be zero, to save output tokens. The model read that
+as licence to drop real values: Biotin disappeared from eggs entirely. Never
+optimise an AI response by asking for less of the data the app depends on.
+
+---
+
+## 13. One aggregation per quantity
+
+**Decision.** `sumMacros` and `computeConsumedMicros` are the only places the
+day's totals are computed. `NutritionTracker` had its own identical copy of the
+macro reduce; it is gone.
+
+**Why.** Both arithmetic bugs found in this area survived because a fix was
+applied to one copy and missed in the other — the NaN guard, and the
+`selectedDate` filter. Two definitions of "what today adds up to" do not stay
+equal, and the failure is silent: two surfaces disagree and neither is obviously
+wrong. Making the function exported and shared is cheaper than a test asserting
+the two copies match.
