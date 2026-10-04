@@ -195,9 +195,13 @@ export const NUTRIENT_INFO: Record<string, NutrientEducation> = {
   "Copper": {
     description: "Helps make red blood cells and keeps nerve cells healthy.",
     sources: ["Liver", "Oysters", "Spirulina", "Dark Chocolate"],
-    dailyValue: "900mcg",
-    targetVal: 900,
-    unit: "mcg"
+    // 0.9 mg and 900 mcg are the same RDA. Stored in mg because that is the
+    // unit the model returns for copper whatever the prompt asks for — USDA
+    // tables use mg and the training prior wins. Scoring mg against a 900
+    // target read as 0.004% DV, i.e. "you ate no copper", every single day.
+    dailyValue: "0.9mg",
+    targetVal: 0.9,
+    unit: "mg"
   },
   "Manganese": {
     description: "Involved in forming connective tissue, bones, and blood clotting factors.",
@@ -231,45 +235,25 @@ export const NUTRIENT_INFO: Record<string, NutrientEducation> = {
   }
 };
 
-export const MOCK_COMMON_FOODS: FoodItem[] = [
-  { 
-    id: '1', name: 'Oatmeal', servingSize: '1 cup cooked', calories: 150, protein: 5, carbs: 27, fat: 3, 
-    micros: { "Fiber": 4, "Iron": 1.7, "Magnesium": 60, "Zinc": 1.5, "Phosphorus": 180, "Thiamin": 0.2, "Manganese": 1.3, "Selenium": 12, "Sugar": 1 } 
-  },
-  { 
-    id: '2', name: 'Banana', servingSize: 'Medium', calories: 105, protein: 1, carbs: 27, fat: 0, 
-    micros: { "Potassium": 422, "Vitamin C": 10, "Fiber": 3, "Vitamin B6": 0.4, "Manganese": 0.3, "Sugar": 14 } 
-  },
-  { 
-    id: '3', name: 'Chicken Breast', servingSize: '4oz', calories: 165, protein: 31, carbs: 0, fat: 3.6, 
-    micros: { "Vitamin B6": 0.5, "Niacin": 14, "Selenium": 30, "Phosphorus": 250, "Choline": 95, "Pantothenic Acid": 1.6, "Copper": 40, "Zinc": 1 } 
-  },
-  { 
-    id: '4', name: 'Salmon', servingSize: '4oz', calories: 200, protein: 23, carbs: 0, fat: 12, 
-    micros: { "Omega-3": 1.5, "Vitamin D": 12, "Vitamin B12": 4.5, "Selenium": 40, "Niacin": 8, "Iodine": 30, "Copper": 70 } 
-  },
-  { 
-    id: '5', name: 'Rice', servingSize: '1 cup cooked', calories: 200, protein: 4, carbs: 44, fat: 0.4, 
-    micros: { "Iron": 1.9, "Folate": 90, "Thiamin": 0.2, "Manganese": 0.7, "Selenium": 11, "Sugar": 0.1 } 
-  },
-  { 
-    id: '6', name: 'Broccoli', servingSize: '1 cup', calories: 55, protein: 3, carbs: 11, fat: 0.6, 
-    micros: { "Vitamin C": 80, "Vitamin K": 220, "Fiber": 5, "Folate": 50, "Potassium": 280, "Sugar": 1.5 } 
-  },
-  { 
-    id: '7', name: 'Almonds', servingSize: '1 oz', calories: 160, protein: 6, carbs: 6, fat: 14, 
-    micros: { "Vitamin E": 7, "Magnesium": 75, "Fiber": 3.5, "Manganese": 0.6, "Riboflavin": 0.3, "Phosphorus": 135, "Copper": 290 } 
-  },
-  { 
-    id: '8', name: 'Greek Yogurt', servingSize: '1 cup', calories: 130, protein: 23, carbs: 9, fat: 0, 
-    micros: { "Calcium": 250, "Vitamin B12": 1.2, "Iodine": 80, "Phosphorus": 300, "Riboflavin": 0.4, "Sugar": 6 } 
-  },
-  { 
-    id: '9', name: 'Egg', servingSize: 'Large', calories: 70, protein: 6, carbs: 0, fat: 5, 
-    micros: { "Vitamin D": 1, "Choline": 147, "Selenium": 15, "Biotin": 10, "Vitamin A": 80, "Vitamin B12": 0.5, "Zinc": 0.6 } 
-  },
-  { 
-    id: '10', name: 'Avocado', servingSize: 'Half', calories: 114, protein: 1, carbs: 6, fat: 10, 
-    micros: { "Fiber": 5, "Potassium": 345, "Vitamin K": 14, "Folate": 80, "Vitamin E": 2, "Pantothenic Acid": 1.4, "Copper": 190, "Sugar": 0.2 } 
-  },
-];
+/**
+ * The three macro keys that live in NUTRIENT_INFO alongside the micros.
+ *
+ * They are here so body systems can score protein against a per-user target,
+ * but they never appear in a FoodItem's `micros` map — macros are stored on
+ * `food.protein` / `.carbs` / `.fat`. Anything iterating "the micronutrients"
+ * must exclude them.
+ */
+export const MACRO_INFO_KEYS = ['Protein', 'Carbohydrates', 'Fats'] as const;
+
+/**
+ * Every micronutrient the app tracks, in display order.
+ *
+ * The single source of the nutrient list. The parse prompt builds its JSON
+ * skeleton and its unit declaration from this array rather than restating them,
+ * because a hand-written copy drifted: Copper was scored in mcg here while the
+ * prompt asked for mg, a 1000x under-report that read as "you ate no copper"
+ * every day for as long as it was wrong.
+ */
+export const MICRO_KEYS = Object.keys(NUTRIENT_INFO).filter(
+  (k) => !(MACRO_INFO_KEYS as readonly string[]).includes(k),
+);

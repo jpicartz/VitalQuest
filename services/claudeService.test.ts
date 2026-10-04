@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood, generateNutritionInsights } from './claudeService';
+import { readFileSync } from 'node:fs';
+import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood, generateNutritionInsights, estimateItemCount, parseFoodLog, MICRO_SKELETON, UNIT_DECLARATION } from './claudeService';
 import { aProfile, aPlan } from '../test/fixtures';
 import { buildInsightsPayload } from '../utils/nutritionAggregates';
-import { NUTRIENT_INFO } from '../data/nutrientData';
+import { MICRO_KEYS, NUTRIENT_INFO } from '../data/nutrientData';
 import { PRIORITY_MICROS } from '../utils/nutritionAggregates';
 
 describe('parseJsonResponse — happy path', () => {
@@ -87,22 +88,32 @@ describe('parseJsonResponse — failure modes', () => {
 });
 
 describe('normalizeMicros', () => {
+  // normalizeMicros now returns ALL 28 tracked keys, filling anything the model
+  // did not report with 0, so these assert the aliasing on top of that baseline
+  // rather than an exact object. The fill is the point: an absent key used to
+  // propagate as `undefined` into every total that read it.
+  const resolved = (raw: Record<string, unknown>) => {
+    const out = normalizeMicros(raw);
+    // Only the keys that came back non-zero, i.e. what the aliasing resolved to.
+    return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== 0));
+  };
+
   it('maps snake_case aliases to canonical Title Case', () => {
-    expect(normalizeMicros({ vitamin_c: 90, vitamin_b12: 2.4 })).toEqual({
+    expect(resolved({ vitamin_c: 90, vitamin_b12: 2.4 })).toEqual({
       'Vitamin C': 90,
       'Vitamin B12': 2.4,
     });
   });
 
   it('maps lowercase spaced aliases', () => {
-    expect(normalizeMicros({ 'vitamin d': 20, 'omega 3': 1.6 })).toEqual({
+    expect(resolved({ 'vitamin d': 20, 'omega 3': 1.6 })).toEqual({
       'Vitamin D': 20,
       'Omega-3': 1.6,
     });
   });
 
   it('maps scientific synonyms', () => {
-    expect(normalizeMicros({ 'ascorbic acid': 90, thiamine: 1.2, cobalamin: 2.4 })).toEqual({
+    expect(resolved({ 'ascorbic acid': 90, thiamine: 1.2, cobalamin: 2.4 })).toEqual({
       'Vitamin C': 90,
       Thiamin: 1.2,
       'Vitamin B12': 2.4,
@@ -110,15 +121,15 @@ describe('normalizeMicros', () => {
   });
 
   it('is case-insensitive on input keys', () => {
-    expect(normalizeMicros({ 'VITAMIN C': 90, FiBeR: 28 })).toEqual({ 'Vitamin C': 90, Fiber: 28 });
+    expect(resolved({ 'VITAMIN C': 90, FiBeR: 28 })).toEqual({ 'Vitamin C': 90, Fiber: 28 });
   });
 
   it('passes canonical keys through unchanged', () => {
-    expect(normalizeMicros({ 'Vitamin C': 90, Fiber: 28 })).toEqual({ 'Vitamin C': 90, Fiber: 28 });
+    expect(resolved({ 'Vitamin C': 90, Fiber: 28 })).toEqual({ 'Vitamin C': 90, Fiber: 28 });
   });
 
   it('passes unknown keys through rather than dropping them', () => {
-    expect(normalizeMicros({ Unobtainium: 5 })).toEqual({ Unobtainium: 5 });
+    expect(resolved({ Unobtainium: 5 })).toEqual({ Unobtainium: 5 });
   });
 
   it.each([
@@ -135,8 +146,12 @@ describe('normalizeMicros', () => {
     expect(Number.isNaN(result.Fiber)).toBe(false);
   });
 
-  it('returns an empty object for empty input', () => {
-    expect(normalizeMicros({})).toEqual({});
+  it('returns every tracked nutrient at 0 for empty input, not an empty object', () => {
+    // A food the model reported no micros for still has all 28 keys, so nothing
+    // downstream has to guard against a missing one.
+    const out = normalizeMicros({});
+    expect(Object.keys(out).sort()).toEqual([...MICRO_KEYS].sort());
+    expect(Object.values(out).every(v => v === 0)).toBe(true);
   });
 });
 
@@ -228,7 +243,10 @@ describe('scaleParsedFood', () => {
   it('survives a food with no micros at all', () => {
     const f = scaleParsedFood({ name: 'Water', unit: '1 glass', quantity: 2, perUnit: { calories: 0 } }, 'id-1');
     expect(f.calories).toBe(0);
-    expect(f.micros).toEqual({});
+    // Every tracked nutrient at 0, not an empty map: water really does contain
+    // none of them, and a complete shape means no reader has to guard.
+    expect(Object.keys(f.micros!).sort()).toEqual([...MICRO_KEYS].sort());
+    expect(Object.values(f.micros!).every(v => v === 0)).toBe(true);
   });
 
   it('rounds to 2dp so trace nutrients survive without float noise', () => {
@@ -350,5 +368,181 @@ describe('parseJsonResponse — structurally broken documents', () => {
 
   it('still rejects something that is not JSON at all', () => {
     expect(() => parseJsonResponse('the model apologised instead')).toThrow(/No valid JSON/);
+  });
+});
+
+describe('the parse prompt and the nutrient reference data cannot disagree', () => {
+  const source = readFileSync(new URL('./claudeService.ts', import.meta.url), 'utf8');
+  const parseFn = source.slice(
+    source.indexOf('export const parseFoodLog'),
+    source.indexOf('const raw = await callClaude', source.indexOf('export const parseFoodLog')),
+  );
+
+  it('tracks 28 micronutrients, all of them scoreable', () => {
+    expect(MICRO_KEYS).toHaveLength(28);
+    for (const k of MICRO_KEYS) {
+      expect(NUTRIENT_INFO[k], `${k} has no NUTRIENT_INFO entry`).toBeDefined();
+      expect(NUTRIENT_INFO[k].unit, `${k} has no unit`).toBeTruthy();
+      expect(NUTRIENT_INFO[k].targetVal, `${k} has no target, so it can never score`).toBeGreaterThan(0);
+    }
+  });
+
+  it('excludes the three macro keys, which are never in a micros map', () => {
+    for (const macro of ['Protein', 'Carbohydrates', 'Fats']) {
+      expect(NUTRIENT_INFO[macro], `${macro} should still be in NUTRIENT_INFO`).toBeDefined();
+      expect(MICRO_KEYS).not.toContain(macro);
+    }
+  });
+
+  it('asks the model for exactly the keys the app scores', () => {
+    const asked = [...MICRO_SKELETON.matchAll(/"([^"]+)":0/g)].map(m => m[1]);
+    expect(asked).toEqual(MICRO_KEYS);
+  });
+
+  it('declares every nutrient in the unit the app scores it in, exactly once', () => {
+    // The bug this makes impossible: Copper was scored in mcg against a 900
+    // target while the prompt asked for mg, so a real 0.9 mg read as 0.1% DV —
+    // a 1000x under-report that looked like a plausible small number.
+    const declared = new Map<string, string>();
+    for (const clause of UNIT_DECLARATION.split(';')) {
+      const m = clause.match(/^\s*(.+?)\s+in\s+(\S+)\s*$/);
+      expect(m, `unparseable unit clause: "${clause}"`).not.toBeNull();
+      for (const key of m![1].split(',')) {
+        const k = key.trim();
+        expect(declared.has(k), `${k} is declared twice`).toBe(false);
+        declared.set(k, m![2]);
+      }
+    }
+    expect([...declared.keys()].sort()).toEqual([...MICRO_KEYS].sort());
+    for (const k of MICRO_KEYS) {
+      expect(declared.get(k), `${k}: prompt and NUTRIENT_INFO disagree`).toBe(NUTRIENT_INFO[k].unit);
+    }
+  });
+
+  it('builds the prompt from the constants rather than a hand-written copy', () => {
+    // A literal key list in the prompt is how the Copper drift happened. If
+    // someone inlines one again, this fails.
+    expect(parseFn).toContain('${MICRO_SKELETON}');
+    expect(parseFn).toContain('${UNIT_DECLARATION}');
+    const inlined = [...parseFn.matchAll(/"(Vitamin [A-Z0-9]+|Biotin|Copper|Selenium|Iodine)":0/g)];
+    expect(inlined.map(m => m[1]), 'nutrient keys were inlined into the prompt').toEqual([]);
+  });
+
+  it('never tells the model to omit a nutrient', () => {
+    // Asking for omission of "zero" values made the model drop real ones —
+    // eggs came back with no Biotin at all, which the app reads as none.
+    expect(parseFn).not.toMatch(/OMIT any micronutrient/i);
+    expect(parseFn).toMatch(/INCLUDE EVERY MICRONUTRIENT KEY/i);
+  });
+});
+
+describe('estimateItemCount sizes the output budget', () => {
+  const budget = (input: string) =>
+    Math.min(4096, Math.max(1600, 600 + estimateItemCount(input) * 350));
+
+  it('counts the separators people type, not just newlines', () => {
+    // The regression: this is one line and seven foods. Counting lines gave it
+    // the floor, the response hit max_tokens, and the whole parse was lost.
+    const oneLine =
+      '3 scrambled eggs with 30g cheddar, 2 slices wholemeal toast with butter, a banana, and 200g greek yogurt with honey';
+    expect(estimateItemCount(oneLine)).toBeGreaterThanOrEqual(6);
+    expect(budget(oneLine)).toBeGreaterThan(2500);
+  });
+
+  it('counts newline-separated items', () => {
+    expect(estimateItemCount('oatmeal\nbanana\ncoffee')).toBe(3);
+  });
+
+  it('never returns less than one, whatever the input', () => {
+    for (const junk of ['', '   ', ',,,', '\n\n', 'a']) {
+      expect(estimateItemCount(junk)).toBe(1);
+      expect(budget(junk)).toBe(1600);
+    }
+  });
+
+  it('stays within the proxy output cap however long the input', () => {
+    expect(budget(Array(200).fill('egg').join(', '))).toBe(4096);
+  });
+});
+
+describe('parseFoodLog guarantees a complete nutrient shape', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  /** A perUnit food reporting only the first `n` of the 28 tracked micros. */
+  const foodWith = (n: number) => ({
+    name: 'Egg', unit: '1 large egg (50g)', quantity: 2,
+    perUnit: {
+      calories: 72, protein: 6.3, carbs: 0.4, fat: 4.8,
+      micros: Object.fromEntries(MICRO_KEYS.slice(0, n).map((k, i) => [k, i + 1])),
+    },
+  });
+
+  /** Queues one response per call, so a retry gets the next one. */
+  const withResponses = (...payloads: unknown[]) => {
+    const fetchMock = vi.fn();
+    for (const p of payloads) {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ content: [{ type: 'text', text: JSON.stringify(p) }], stop_reason: 'end_turn' }),
+      });
+    }
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  it('fills every tracked micronutrient even when the model omits most of them', async () => {
+    withResponses({ foods: [foodWith(28)] });
+    const [food] = await parseFoodLog('2 eggs');
+    expect(Object.keys(food.micros!).sort()).toEqual([...MICRO_KEYS].sort());
+  });
+
+  it('a key the model omitted reads as 0, never undefined or NaN', async () => {
+    // Biotin is deliberately outside the first 10 keys: this is the shape of
+    // the original bug, where an omitted Biotin became an absent key and every
+    // total downstream silently skipped it.
+    withResponses({ foods: [foodWith(10)] }, { foods: [foodWith(10)] });
+    const [food] = await parseFoodLog('2 eggs');
+    expect(food.micros!.Biotin).toBe(0);
+    for (const k of MICRO_KEYS) {
+      expect(food.micros![k], `${k} is not a finite number`).toEqual(expect.any(Number));
+      expect(Number.isFinite(food.micros![k])).toBe(true);
+    }
+  });
+
+  it('retries once when the response is materially incomplete', async () => {
+    const fetchMock = withResponses({ foods: [foodWith(8)] }, { foods: [foodWith(28)] });
+    const [food] = await parseFoodLog('2 eggs');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The complete retry won, so a real value survives where the first attempt
+    // had nothing.
+    expect(food.micros!.Iodine).toBeGreaterThan(0);
+  });
+
+  it('does not retry when the response is complete — a retry costs money', async () => {
+    const fetchMock = withResponses({ foods: [foodWith(28)] });
+    await parseFoodLog('2 eggs');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry over a couple of missing trace values', async () => {
+    const fetchMock = withResponses({ foods: [foodWith(26)] });
+    await parseFoodLog('2 eggs');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the first attempt when the retry comes back worse', async () => {
+    const fetchMock = withResponses({ foods: [foodWith(15)] }, { foods: [foodWith(4)] });
+    const [food] = await parseFoodLog('2 eggs');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Key 15 was present in attempt one and absent in the worse retry.
+    expect(food.micros![MICRO_KEYS[14]]).toBeGreaterThan(0);
+  });
+
+  it('scales the per-unit values by quantity', async () => {
+    withResponses({ foods: [foodWith(28)] });
+    const [food] = await parseFoodLog('2 eggs');
+    expect(food.calories).toBe(144);          // 72 x 2
+    expect(food.protein).toBe(12.6);          // 6.3 x 2
+    expect(food.micros![MICRO_KEYS[0]]).toBe(2); // 1 x 2
   });
 });

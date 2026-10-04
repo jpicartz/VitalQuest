@@ -93,19 +93,41 @@ export interface WeeklyMacroTotals {
   fat: number;
 }
 
-// Same NaN guard as computeMicroScore: `Number(x) || 0` coerces a stray
-// "350 kcal" to 0 rather than poisoning every downstream total with NaN.
-const sumDayLogs = (logs: MealLog[]) =>
+/** Calories + the three macros. The shape every macro surface reads. */
+export interface ConsumedTotals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+/**
+ * Calories and macros for a set of logs. The ONE macro aggregation in the app.
+ *
+ * `logs` must already be scoped to the day you want; this function does not
+ * filter by date, exactly like computeConsumedMicros. It is exported because
+ * NutritionTracker had its own identical copy of this reduce: two definitions
+ * of "what the day adds up to" drift, and the last two arithmetic bugs here
+ * were both a fix applied to one copy and missed in the other.
+ *
+ * Same NaN guard as computeMicroScore: `Number(x) || 0` coerces a stray
+ * "350 kcal" to 0 rather than poisoning every downstream total with NaN.
+ */
+export const sumMacros = (logs: MealLog[]): ConsumedTotals =>
   logs.reduce(
     (acc, log) => ({
       calories: acc.calories + (Number(log.food.calories) || 0),
       protein: acc.protein + (Number(log.food.protein) || 0),
       carbs: acc.carbs + (Number(log.food.carbs) || 0),
       fat: acc.fat + (Number(log.food.fat) || 0),
-      mealCount: acc.mealCount + 1,
     }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0, mealCount: 0 }
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
+
+const sumDayLogs = (logs: MealLog[]) => ({
+  ...sumMacros(logs),
+  mealCount: logs.length,
+});
 
 /** Last N calendar days (oldest → newest), including days with zero logs. */
 export const getLastNDaysSummaries = (logs: MealLog[], days = 7): DailyNutritionSummary[] => {

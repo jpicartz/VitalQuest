@@ -8,6 +8,7 @@ import {
   PRIORITY_MICROS,
   DailyNutritionSummary,
   weightOnDate,
+  sumMacros,
 } from './nutritionAggregates';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { MealLog, FoodItem } from '../types';
@@ -326,5 +327,71 @@ describe('weightOnDate', () => {
   it('does not assume the history is sorted', () => {
     const shuffled = [history[2], history[0], history[1]];
     expect(weightOnDate(shuffled, '2026-09-12')).toBe(80);
+  });
+});
+
+describe('every nutrient adds up — macros and all 28 micros', () => {
+  /** Every micronutrient the app knows, each at a distinct non-round value. */
+  const allMicros = (): Record<string, number> =>
+    Object.fromEntries(
+      Object.keys(NUTRIENT_INFO)
+        .filter((k) => !['Protein', 'Carbohydrates', 'Fats'].includes(k))
+        .map((k, i) => [k, 1 + i * 0.37]),
+    );
+
+  it('sums all 28 micronutrients across logs, dropping none', () => {
+    const one = allMicros();
+    const consumed = computeConsumedMicros([
+      log({ micros: one }),
+      log({ micros: one }),
+      log({ micros: one }),
+    ]);
+
+    expect(Object.keys(consumed).sort()).toEqual(Object.keys(one).sort());
+    for (const [k, v] of Object.entries(one)) {
+      expect(consumed[k], `${k} did not triple`).toBeCloseTo(v * 3, 6);
+    }
+  });
+
+  it('sums macros across logs', () => {
+    const totals = sumMacros([
+      log({ calories: 310, protein: 24.5, carbs: 31.2, fat: 9.8 }),
+      log({ calories: 190, protein: 8.5, carbs: 18.8, fat: 6.2 }),
+    ]);
+    expect(totals).toEqual({ calories: 500, protein: 33, carbs: 50, fat: 16 });
+  });
+
+  it('counts a nutrient once per log, not once per day', () => {
+    // Biotin specifically: it was absent from parsed foods entirely, so the
+    // tile read 0% no matter how much the user ate. The parse side is fixed in
+    // claudeService; this asserts the aggregation never loses it either.
+    const consumed = computeConsumedMicros([
+      log({ micros: { Biotin: 10 } }),
+      log({ micros: { Biotin: 10 } }),
+      log({ micros: { Biotin: 10 } }),
+      log({ micros: { Biotin: 10 } }),
+      log({ micros: { Biotin: 10 } }),
+    ]);
+    expect(consumed.Biotin).toBe(50);
+    // 50 mcg against a 30 mcg target — over target, which the UI must show as
+    // such rather than clamping the underlying number.
+    expect(consumed.Biotin / NUTRIENT_INFO.Biotin.targetVal!).toBeCloseTo(1.667, 2);
+  });
+
+  it('a missing key is zero, not a crash — and never NaN', () => {
+    const consumed = computeConsumedMicros([log({ micros: { Biotin: 10 } })]);
+    expect(consumed.Copper ?? 0).toBe(0);
+    for (const v of Object.values(consumed)) expect(Number.isFinite(v)).toBe(true);
+  });
+
+  it('string values coerce to 0 rather than poisoning the total', () => {
+    const consumed = computeConsumedMicros([
+      log({ micros: { Biotin: 10 } }),
+      log({ micros: { Biotin: '10mcg' as unknown as number } }),
+    ]);
+    expect(consumed.Biotin).toBe(10);
+    const totals = sumMacros([log({ calories: '420 kcal' as unknown as number, protein: 10 })]);
+    expect(totals.calories).toBe(0);
+    expect(totals.protein).toBe(10);
   });
 });

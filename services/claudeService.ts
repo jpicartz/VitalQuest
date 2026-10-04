@@ -1,6 +1,7 @@
 import { UserProfile, WellnessPlan, FoodItem, MealSuggestion, MacroTargets, NutritionInsight } from "../types";
 import type { InsightsPayload } from "../utils/nutritionAggregates";
 import { COACH_SYSTEM_RULES } from "../utils/coachSafety";
+import { NUTRIENT_INFO, MICRO_KEYS } from '../data/nutrientData';
 
 // Full-reasoning model for plan generation and weekly insights
 const MODEL = 'claude-sonnet-4-5';
@@ -282,7 +283,18 @@ export const MICRO_KEY_MAP: Record<string, string> = {
 };
 
 export const normalizeMicros = (raw: Record<string, unknown>): FoodItem['micros'] => {
+  // Start from every key the app scores, at 0. The prompt asks the model to
+  // return all of them, but compliance is not guaranteed — the same request
+  // came back 28/28 on one call and 27/28 on the next. Guaranteeing the SHAPE
+  // here means a dropped key can never become an `undefined` propagating into
+  // a total; it reads as 0, the same as a food that genuinely has none.
+  //
+  // This cannot recover the VALUE the model omitted. That is a limit of the
+  // estimate, not a bug to paper over, and it is why the prompt still insists
+  // on every key rather than relying on this fill alone.
   const result: FoodItem['micros'] = {};
+  for (const k of MICRO_KEYS) result[k] = 0;
+
   for (const [key, val] of Object.entries(raw)) {
     const canonical = MICRO_KEY_MAP[key.toLowerCase()] || key; // fall back to original if unknown
     result[canonical] = Number(val) || 0;
@@ -350,6 +362,79 @@ export const scaleParsedFood = (f: ParsedFood, id: string): FoodItem => {
   };
 };
 
+/**
+ * Rough count of distinct foods in a free-text log, used only to size the
+ * output budget.
+ *
+ * It splits on newlines AND on the separators people actually type, because
+ * counting lines alone was wrong in the common case: "3 eggs, toast, a banana
+ * and yogurt" is one line and four foods, so it was given the 1500-token floor
+ * and the response was truncated mid-JSON. Over-counting is harmless (a bigger
+ * budget costs nothing unless the tokens are used); under-counting loses the
+ * whole parse.
+ */
+export const estimateItemCount = (input: string): number => {
+  const segments = input
+    .split(/\n|,|;|\band\b|\bwith\b|\bplus\b|&|\+/i)
+    .map(sg => sg.trim())
+    // A segment needs a word in it to be a food; "" and "a" are not items.
+    .filter(sg => sg.length > 1 && /[a-z]{2}/i.test(sg));
+  return Math.max(1, segments.length);
+};
+
+/** One food of minified JSON with all 28 micros costs ~230 output tokens. */
+const ITEM_TOKEN_COST = 350;
+/** Headroom for a short input that expands into several foods. */
+const MIN_PARSE_TOKENS = 1600;
+/** The proxy rejects anything above its own MAX_OUTPUT_TOKENS. */
+const MAX_PARSE_TOKENS = 4096;
+
+/**
+ * The micros skeleton the model is asked to fill, generated from MICRO_KEYS.
+ *
+ * Generated rather than written out so the prompt and NUTRIENT_INFO cannot ask
+ * for different nutrients, and so adding a nutrient to the reference data is a
+ * one-line change that reaches the prompt automatically.
+ */
+export const MICRO_SKELETON = `{${MICRO_KEYS.map(k => `"${k}":0`).join(',')}}`;
+
+/**
+ * The unit declaration, also generated from the reference data.
+ *
+ * Grouping by the unit each nutrient is SCORED in is what makes the numbers
+ * comparable: a value reported in mg and scored against a mcg target is wrong
+ * by 1000x and shows as a plausible-looking small percentage, not as an error.
+ */
+export const UNIT_DECLARATION = (() => {
+  const byUnit = new Map<string, string[]>();
+  for (const k of MICRO_KEYS) {
+    const u = NUTRIENT_INFO[k]?.unit ?? 'mg';
+    byUnit.set(u, [...(byUnit.get(u) ?? []), k]);
+  }
+  return [...byUnit.entries()]
+    .map(([unit, keys]) => `${keys.join(', ')} in ${unit}`)
+    .join('; ');
+})();
+
+/**
+ * How many of the 28 tracked micronutrients the model actually reported.
+ *
+ * Counts the RAW response, before normalizeMicros fills the shape — after the
+ * fill every food has all 28 keys, so measuring there would always say 28 and
+ * the check would be useless.
+ */
+const reportedMicroCount = (f: ParsedFood): number => {
+  const micros = ((f.perUnit ?? f) as { micros?: Record<string, unknown> }).micros ?? {};
+  return MICRO_KEYS.filter(k => micros[k] !== undefined).length;
+};
+
+/** The least complete food in a response; -1 for an empty response. */
+const worstMicroCount = (foods: ParsedFood[]): number =>
+  foods.length ? Math.min(...foods.map(reportedMicroCount)) : -1;
+
+/** Below 75% of the 28 keys, the response is treated as materially incomplete. */
+const MIN_REPORTED_MICROS = 21;
+
 export const parseFoodLog = async (input: string): Promise<FoodItem[]> => {
   const prompt = `Identify each food in this description and report its nutrition PER SINGLE UNIT, plus how many units the user had. Do NOT multiply — the app does that.
 
@@ -361,10 +446,12 @@ For each food:
 - "perUnit": nutrition for ONE unit only, from USDA reference data
 
 Return ONLY JSON using EXACTLY these micro key names:
-{"foods":[{"name":"...","unit":"...","quantity":1,"perUnit":{"calories":0,"protein":0,"carbs":0,"fat":0,"micros":{"Fiber":0,"Sugar":0,"Vitamin A":0,"Vitamin C":0,"Vitamin D":0,"Vitamin E":0,"Vitamin K":0,"Thiamin":0,"Riboflavin":0,"Niacin":0,"Vitamin B6":0,"Folate":0,"Vitamin B12":0,"Biotin":0,"Pantothenic Acid":0,"Choline":0,"Calcium":0,"Iron":0,"Magnesium":0,"Phosphorus":0,"Potassium":0,"Sodium":0,"Zinc":0,"Copper":0,"Manganese":0,"Selenium":0,"Iodine":0,"Omega-3":0}}}]}
-Units: Vitamin A/D/K/Folate/B12/Biotin/Selenium/Iodine in mcg; other vitamins and minerals in mg; Omega-3 in g. Estimate from USDA rather than returning 0 where a reasonable value exists. All numbers, no strings.
+{"foods":[{"name":"...","unit":"...","quantity":1,"perUnit":{"calories":0,"protein":0,"carbs":0,"fat":0,"micros":${MICRO_SKELETON}}}]}
+Units — use EXACTLY these, they are what the app scores against: ${UNIT_DECLARATION}. Vitamin A as mcg RAE and Vitamin D as mcg cholecalciferol — NOT IU; Vitamin E as mg alpha-tocopherol. Estimate from USDA rather than returning 0 where a reasonable value exists. All numbers, no strings.
 
-OUTPUT SIZE MATTERS: return MINIFIED JSON on a single line — no newlines, no indentation, no spaces after colons or commas. OMIT any micronutrient whose value would be 0 rather than listing it; a missing key is read as zero. A long ingredient list that exceeds the response limit is truncated and lost entirely, so be compact.`;
+OUTPUT SIZE MATTERS: return MINIFIED JSON on a single line — no newlines, no indentation, no spaces after colons or commas.
+
+INCLUDE EVERY MICRONUTRIENT KEY LISTED ABOVE for every food, even when the value is small or zero. A missing key is read as zero by the app, so omitting one silently under-reports that nutrient — eggs without "Biotin" means the user is told they ate none. Estimate from USDA; use 0 only when the food genuinely contains none.`;
 
   // NOTE: this deliberately throws rather than returning [] — the caller needs
   // to distinguish "no food found" from "the request failed" so it can tell the
@@ -372,17 +459,46 @@ OUTPUT SIZE MATTERS: return MINIFIED JSON on a single line — no newlines, no i
   // One food costs roughly 200 output tokens minified. Budget per line of
   // input, with headroom, and stop at the proxy's 4096 output clamp — that
   // limit bounds abuse cost and is not worth weakening for a long recipe.
-  const lines = input.split('\n').filter(l => l.trim()).length || 1;
-  const budget = Math.min(4096, Math.max(1500, 600 + lines * 320));
-
-  const raw = await callClaude(
-    'Precise nutrition database. Report per-unit values only; never multiply. Return only minified JSON.',
-    prompt,
-    budget,
-    MODEL_FAST
+  // Floor as well as a ceiling: a vague one-segment input ("my usual breakfast")
+  // can legitimately expand into several foods, and a truncated response loses
+  // the whole parse rather than part of it.
+  const budget = Math.min(
+    MAX_PARSE_TOKENS,
+    Math.max(MIN_PARSE_TOKENS, 600 + estimateItemCount(input) * ITEM_TOKEN_COST),
   );
-  const data = parseJsonResponse(raw);
-  return (data.foods || []).map((f: ParsedFood, i: number) =>
+
+  const requestFoods = async (): Promise<ParsedFood[]> => {
+    const raw = await callClaude(
+      'Precise nutrition database. Report per-unit values only; never multiply. Return only minified JSON.',
+      prompt,
+      budget,
+      MODEL_FAST
+    );
+    return (parseJsonResponse(raw).foods || []) as ParsedFood[];
+  };
+
+  let foods = await requestFoods();
+
+  // The prompt insists on all 28 micro keys, and compliance is NOT reliable:
+  // the same request came back with 28 of 28 per food on one call and roughly
+  // half on the next. That matters because a key the model skipped is
+  // indistinguishable, in the UI, from a food that genuinely contains none of
+  // that nutrient — the user is simply told they ate no vitamin D.
+  //
+  // So the completeness check lives here, in code, rather than being left to
+  // the prompt. One retry when the shortfall is severe: a wasted Haiku call
+  // costs a fraction of a cent, which is far below the cost of a wrong number
+  // in a health app. A small shortfall is accepted rather than retried, because
+  // retrying on one missing trace value would double the cost of every parse.
+  if (foods.length && foods.some(f => reportedMicroCount(f) < MIN_REPORTED_MICROS)) {
+    const retry = await requestFoods();
+    // Keep whichever attempt reported more. A retry can come back worse, and
+    // blindly preferring the second attempt would sometimes throw away the
+    // better answer.
+    if (worstMicroCount(retry) > worstMicroCount(foods)) foods = retry;
+  }
+
+  return foods.map((f: ParsedFood, i: number) =>
     scaleParsedFood(f, `claude-${Date.now()}-${i}-${Math.random().toString(36).substring(7)}`)
   );
 };

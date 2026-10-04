@@ -11,7 +11,7 @@ import { Button } from './ui/Button';
 import { MetricChipRail, metricsFromFood, metricsFromWater, type Metric } from './ui/MetricChip';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
-import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, scoreFromConsumed, weightOnDate, PRIORITY_MICROS } from '../utils/nutritionAggregates';
+import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, sumMacros, scoreFromConsumed, weightOnDate, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
@@ -112,14 +112,10 @@ const isViewingToday = selectedDate === toISODateString();
   // Export state
   const reportRef = useRef<HTMLDivElement>(null);
   
-  // `Number(x) || 0`, NOT `Number(x || 0)` — a string value like "420 kcal"
-  // yields NaN under the latter and poisons every total it reaches.
-  const consumedMacros = logs.reduce((acc, log) => ({
-    calories: acc.calories + (Number(log.food.calories) || 0),
-    protein: acc.protein + (Number(log.food.protein) || 0),
-    carbs: acc.carbs + (Number(log.food.carbs) || 0),
-    fat: acc.fat + (Number(log.food.fat) || 0),
-  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  // Shared with the trend charts and the weekly insights payload, for the same
+  // reason consumedMicros is shared with the score: one definition of the day's
+  // total means the donut, the bars and the charts cannot disagree.
+  const consumedMacros = useMemo(() => sumMacros(logs), [logs]);
 
   // `logs` is already the selected day's logs, so no date filter is needed here.
   // Shared with computeMicroScore so the tiles and the score can never disagree.
