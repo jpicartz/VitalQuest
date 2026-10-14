@@ -1,6 +1,6 @@
 import { MealLog } from '../types';
 import { toISODateString, isSameISODate } from './dateUtils';
-import { NUTRIENT_INFO } from '../data/nutrientData';
+import { NUTRIENT_INFO, MICRO_KEYS } from '../data/nutrientData';
 
 /** Canonical priority micronutrients used for the score and snapshot bar. */
 export const PRIORITY_MICROS = [
@@ -223,4 +223,100 @@ export const weightOnDate = (
     .filter(e => e.date <= dateISO)
     .sort((a, b) => a.date.localeCompare(b.date));
   return onOrBefore.length ? onOrBefore[onOrBefore.length - 1].kg : null;
+};
+
+export interface RangeAverages {
+  daysLogged: number;
+  avgCalories: number;
+  avgProtein: number;
+}
+
+/**
+ * Average calories and protein across a range.
+ *
+ * Divided by days actually LOGGED, not days elapsed. An unlogged day is missing
+ * data, not a zero-calorie day, and averaging it in would quietly tell someone
+ * who logged four days out of seven that they are eating far less than they are.
+ * buildInsightsPayload already made this choice for the AI payload; this is the
+ * same rule for the number now shown on screen.
+ */
+export const averagesForRange = (summaries: DailyNutritionSummary[]): RangeAverages => {
+  const logged = summaries.filter((d) => d.mealCount > 0);
+  if (logged.length === 0) return { daysLogged: 0, avgCalories: 0, avgProtein: 0 };
+  return {
+    daysLogged: logged.length,
+    avgCalories: Math.round(logged.reduce((sum, d) => sum + (Number(d.calories) || 0), 0) / logged.length),
+    avgProtein: Math.round(logged.reduce((sum, d) => sum + (Number(d.protein) || 0), 0) / logged.length),
+  };
+};
+
+export interface MissedNutrient {
+  nutrient: string;
+  /** Logged days on which this nutrient came in under half its target. */
+  daysMissed: number;
+  /** Logged days considered, so the UI can say "4 of 7". */
+  daysLogged: number;
+  /** Mean percentage of target across those logged days, 0-100+. */
+  avgPct: number;
+}
+
+/** Below this share of target, a nutrient counts as missed for the day. */
+const MISSED_THRESHOLD = 0.5;
+
+/**
+ * The nutrients most often missed across a range of days.
+ *
+ * Answers "what do I keep running short on?", which no surface answered before
+ * — the daily gaps list only ever described today.
+ *
+ * Three rules, each of which changes the answer:
+ *  - Only days WITH meals count. An unlogged day would otherwise "miss" all 28
+ *    nutrients and the result would just rank how little someone logged.
+ *  - Ceilings are skipped. Coming in under the sodium limit is the goal, not a
+ *    gap, and listing it here would invert the advice.
+ *  - The 50% threshold matches `nutrientGaps` in NutritionTracker, so the daily
+ *    and range views can never disagree about what counts as missed.
+ */
+export const mostMissedNutrients = (
+  logs: MealLog[],
+  dateKeys: string[],
+  limit = 5,
+): MissedNutrient[] => {
+  const stats = new Map<string, { missed: number; pctSum: number }>();
+  let daysLogged = 0;
+
+  for (const dateKey of dateKeys) {
+    const dayLogs = logs.filter((l) => l.timestamp && isSameISODate(l.timestamp, dateKey));
+    if (dayLogs.length === 0) continue;
+    daysLogged++;
+
+    const consumed = computeConsumedMicros(dayLogs);
+    for (const nutrient of MICRO_KEYS) {
+      const info = NUTRIENT_INFO[nutrient];
+      if (!info?.targetVal || info.direction === 'ceiling') continue;
+      const pct = (Number(consumed[nutrient]) || 0) / info.targetVal;
+      const entry = stats.get(nutrient) ?? { missed: 0, pctSum: 0 };
+      entry.pctSum += pct;
+      if (pct < MISSED_THRESHOLD) entry.missed++;
+      stats.set(nutrient, entry);
+    }
+  }
+
+  if (daysLogged === 0) return [];
+
+  return [...stats.entries()]
+    .map(([nutrient, v]) => ({
+      nutrient,
+      daysMissed: v.missed,
+      daysLogged,
+      avgPct: Math.round((v.pctSum / daysLogged) * 100),
+    }))
+    .filter((n) => n.daysMissed > 0)
+    // Most often missed first, then the most severe, then alphabetical so the
+    // order is stable across renders when days and severity tie.
+    .sort((a, b) =>
+      b.daysMissed - a.daysMissed ||
+      a.avgPct - b.avgPct ||
+      a.nutrient.localeCompare(b.nutrient))
+    .slice(0, limit);
 };

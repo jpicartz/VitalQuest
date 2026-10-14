@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button';
 import { MacroTargets, UserProfile, WellnessPlan, NutritionInsight } from '../types';
 import { DailyNutritionSummary, buildInsightsPayload } from '../utils/nutritionAggregates';
-import { generateNutritionInsights } from '../services/claudeService';
-import { IconSparkles, IconCheck, IconArrowRight } from '@tabler/icons-react';
+import { generateNutritionInsights, topInsightBullets } from '../services/claudeService';
+import { IconSparkles, IconCheck } from '@tabler/icons-react';
 
 interface NutritionInsightsProps {
   dailySummaries: DailyNutritionSummary[];
@@ -23,6 +23,7 @@ export const NutritionInsights: React.FC<NutritionInsightsProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const daysLogged = dailySummaries.filter((d) => d.mealCount > 0).length;
+  const bullets = insights ? topInsightBullets(insights) : [];
 
   const loadInsights = async () => {
     if (daysLogged === 0) return;
@@ -84,14 +85,17 @@ export const NutritionInsights: React.FC<NutritionInsightsProps> = ({
       {insights && (
         <div className="space-y-4">
           <p className="text-lg font-bold">{insights.headline}</p>
-          {insights.patterns.length > 0 && (
-            <ul className="space-y-2 text-sm bg-white/10 p-4 rounded-tile">
-              {insights.patterns.map((p, i) => <li key={i} className="flex items-start gap-2"><IconArrowRight size={15} className="shrink-0 mt-0.5 opacity-80" /> {p}</li>)}
-            </ul>
-          )}
-          {insights.recommendations.length > 0 && (
+          {/* One capped list, not three stacked ones. This card used to render
+              a headline plus two uncapped arrays, which on a real week was a
+              dense block of prose nobody read. topInsightBullets merges and
+              caps them — the limit lives in code, not only in the prompt. */}
+          {bullets.length > 0 && (
             <ul className="space-y-2 text-sm">
-              {insights.recommendations.map((r, i) => <li key={i} className="flex items-start gap-2 bg-white/10 px-3 py-2 rounded-control"><IconCheck size={15} stroke={2.5} className="shrink-0 mt-0.5" /> {r}</li>)}
+              {bullets.map((b, i) => (
+                <li key={i} className="flex items-start gap-2.5 bg-white/10 px-3 py-2.5 rounded-control">
+                  <IconCheck size={15} stroke={2.5} className="shrink-0 mt-0.5 opacity-90" /> {b}
+                </li>
+              ))}
             </ul>
           )}
           {/* This surface renders AI health guidance, so it carries its own notice. */}

@@ -607,6 +607,32 @@ Return ONLY JSON: {"prepTime":"...","cookTime":"...","servings":2,"ingredients":
   };
 };
 
+/** The most bullets the insights card will ever render. */
+export const MAX_INSIGHT_BULLETS = 5;
+
+/**
+ * The bullets worth showing, capped.
+ *
+ * The prompt asks for five; this is what guarantees five. Model compliance with
+ * a stated count is not reliable (decisions.md §12), and the failure here is
+ * the one the user actually reported: a wall of text nobody reads.
+ *
+ * Merges all three arrays the model returns — including `insights`, which was
+ * parsed, typed and never rendered since it was written. Recommendations lead
+ * because they are the actionable ones, so they are what survives the cap.
+ */
+export const topInsightBullets = (
+  insight: NutritionInsight,
+  max = MAX_INSIGHT_BULLETS,
+): string[] =>
+  [...(insight.recommendations ?? []), ...(insight.patterns ?? []), ...(insight.insights ?? [])]
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
+    // The three arrays overlap in practice — the model often repeats a pattern
+    // as a recommendation, and two identical bullets waste one of only five.
+    .filter((s, i, all) => all.indexOf(s) === i)
+    .slice(0, max);
+
 export const generateNutritionInsights = async (
   weekSummary: InsightsPayload,
   profile: UserProfile,
@@ -615,6 +641,9 @@ export const generateNutritionInsights = async (
   const planContext = plan ? `Plan focus: ${plan.nutritionFocus}. Gaps: ${plan.nutritionGaps.join(', ')}.` : '';
   const prompt = `Analyze last 7 days nutrition. User: ${profile.goal}. ${planContext}
 Data: ${JSON.stringify(weekSummary)}
+
+Write for someone scanning on a phone. AT MOST ${MAX_INSIGHT_BULLETS} bullets in total across patterns, insights and recommendations combined — fewer is better. Each bullet is ONE short sentence under 14 words, and cites a number from the data rather than giving generic advice ("Protein averaged 82g against your 118g target", not "try to eat more protein"). The headline is one sentence.
+
 Return ONLY JSON: {"headline":"...","patterns":["..."],"insights":["..."],"recommendations":["..."],"encouragement":"..."}`;
 
   try {
@@ -685,12 +714,17 @@ export const buildCoachContext = (ctx: CoachContext): string => {
       : '',
     dailyCalorieTarget ? `Daily calorie target: ${dailyCalorieTarget} kcal.` : '',
     planFocus ? `Plan focus: ${planFocus}` : '',
+    // The subject anchor sits ABOVE the scores deliberately. This block is
+    // truncated from the end at MAX_CONTEXT_CHARS, and the scores line is the
+    // one that grows — it gained two systems when Brain and Heart were added,
+    // leaving ~86 characters of headroom. Last meant first to be cut, and
+    // losing this line turns a scoped coach back into a blank chat box.
+    subject ? `The user opened this conversation from their ${subject} score, so answer about that unless they ask otherwise.` : '',
     systems.length
       ? `Today's nutrient support scores: ${systems
           .map((s) => `${s.label} ${s.score}%${s.gaps.length ? ` (short on ${s.gaps.slice(0, 3).join(', ')})` : ''}`)
           .join('; ')}.`
       : 'No food logged today.',
-    subject ? `The user opened this conversation from their ${subject} score, so answer about that unless they ask otherwise.` : '',
   ].filter(Boolean);
 
   const out = lines.join('\n');

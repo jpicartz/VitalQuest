@@ -178,6 +178,8 @@ describe('coach context budget', () => {
         { label: 'Energy', score: 63, gaps: ['Vitamin B12', 'Folate', 'Riboflavin'] },
         { label: 'Immune', score: 78, gaps: [] },
         { label: 'Bone', score: 60, gaps: ['Calcium', 'Vitamin K', 'Manganese'] },
+        { label: 'Brain', score: 40, gaps: ['Omega-3', 'Vitamin B12', 'Choline'] },
+        { label: 'Heart', score: 38, gaps: ['Omega-3', 'Potassium', 'Fiber'] },
       ],
       subject: 'Hair & Nails',
       planFocus: 'Prioritise iron-rich plant foods alongside vitamin C to aid absorption, and keep protein consistent across meals.',
@@ -210,5 +212,28 @@ describe('coach context budget', () => {
       systems: [],
     });
     expect(ctx).toMatch(/No food logged today/);
+  });
+});
+
+describe('the coach subject anchor survives a full context', () => {
+  it('keeps the subject line even when the context has to be truncated', async () => {
+    const { buildCoachContext } = await import('../services/claudeService');
+    // Far more systems than the app has, to force truncation deliberately.
+    const ctx = buildCoachContext({
+      profile: {
+        age: 45, gender: 'Female', heightCm: 165, weightKg: 88,
+        activityLevel: 'Very Active (6-7 days/week)', goal: 'Fat Loss',
+        dietaryRestrictions: ['Vegan', 'Gluten-Free'],
+        medicationsOrConditions: 'A '.repeat(300),
+        sleepHours: 6,
+      } as never,
+      systems: Array.from({ length: 30 }, (_, i) => ({
+        label: `System ${i}`, score: 50, gaps: ['Omega-3', 'Vitamin B12', 'Choline'],
+      })) as never,
+      subject: 'Heart',
+    });
+    // Truncation happens from the end, so this proves the anchor is not last.
+    expect(ctx.endsWith('…'), 'fixture should be large enough to truncate').toBe(true);
+    expect(ctx).toMatch(/opened this conversation from their Heart score/);
   });
 });

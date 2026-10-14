@@ -67,12 +67,12 @@ describe('BodySystems', () => {
 
   it('shows every system at full support when targets are met', () => {
     renderSystems(perfect(), macros({ protein: targets.protein, carbs: targets.carbs, fat: targets.fat }));
-    expect(bandTiles('Strong')).toHaveLength(7);
+    expect(bandTiles('Strong')).toHaveLength(9);
   });
 
   it('shows low support with nothing logged', () => {
     renderSystems();
-    expect(bandTiles('Low')).toHaveLength(7);
+    expect(bandTiles('Low')).toHaveLength(9);
   });
 
   it('ranks the systems worst-first so the order carries information', () => {

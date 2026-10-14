@@ -80,7 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 pb-20">
+    <div className="max-w-7xl mx-auto p-4 md:p-6 pb-20">
       {/* Header */}
       <header className="relative flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-e1 p-5 mb-5 animate-fade-in">
         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -176,21 +176,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* ── Goal: where I'm heading and what to do now ── */}
+      {/* Two columns from lg up. `items-start` matters: without it the grid
+          stretches every card to its tallest sibling, and a short panel grows a
+          block of dead space instead of ending where it ends. */}
       {activeTab === 'goal' && (
-        <div className="space-y-5 animate-fade-in">
+        <div className="animate-fade-in space-y-5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
           {/* All safety refusals live in goalProjection, not in a prompt. */}
           <GoalPanel />
+
+          <div className="space-y-5 lg:row-span-2">
+            <WeightPanel />
+            <ExercisePanel />
+          </div>
 
           {/* Quests are today's actions toward the goal, not free-floating
               gamification — which is why they live here rather than in a tab. */}
           <QuestList dailyQuests={dailyQuests} gamification={gamification} completeQuest={completeQuest} />
 
-          <WeightPanel />
-
-          <ExercisePanel />
-
-          {/* Trend charts + AI weekly insights (was the Trends sub-tab). */}
-        <NutritionTracker view="trends" />
+          {/* Trend charts + AI weekly insights (was the Trends sub-tab).
+              Spans both columns: the charts need the width more than anything
+              beside them would. */}
+          <div className="lg:col-span-2">
+            <NutritionTracker view="trends" />
+          </div>
         </div>
       )}
 

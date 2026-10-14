@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood, generateNutritionInsights, estimateItemCount, parseFoodLog, MICRO_SKELETON, UNIT_DECLARATION } from './claudeService';
+import { parseJsonResponse, normalizeMicros, MICRO_KEY_MAP, scaleParsedFood, generateNutritionInsights, estimateItemCount, parseFoodLog, MICRO_SKELETON, UNIT_DECLARATION, topInsightBullets } from './claudeService';
 import { aProfile, aPlan } from '../test/fixtures';
 import { buildInsightsPayload } from '../utils/nutritionAggregates';
 import { MICRO_KEYS, NUTRIENT_INFO } from '../data/nutrientData';
+import { NutritionInsight } from '../types';
 import { PRIORITY_MICROS } from '../utils/nutritionAggregates';
 
 describe('parseJsonResponse — happy path', () => {
@@ -618,5 +619,50 @@ describe('the prompt does not send the model to USDA for nutrients USDA lacks', 
 
   it('still points at USDA for everything else', () => {
     expect(source).toMatch(/For every other nutrient, estimate from USDA/i);
+  });
+});
+
+describe('topInsightBullets keeps the card readable', () => {
+  const insight = (over: Partial<NutritionInsight> = {}): NutritionInsight => ({
+    headline: 'A week of steady logging.',
+    patterns: [], insights: [], recommendations: [], ...over,
+  });
+
+  it('never returns more than five, however many the model sends', () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => `bullet ${i}`);
+    expect(topInsightBullets(insight({ patterns: twelve }))).toHaveLength(5);
+    expect(
+      topInsightBullets(insight({ patterns: twelve, insights: twelve, recommendations: twelve })),
+    ).toHaveLength(5);
+  });
+
+  it('leads with recommendations, so the actionable ones survive the cap', () => {
+    const out = topInsightBullets(insight({
+      patterns: ['p1', 'p2', 'p3', 'p4', 'p5'],
+      recommendations: ['do this'],
+    }));
+    expect(out[0]).toBe('do this');
+    expect(out).toHaveLength(5);
+  });
+
+  it('includes the insights array, which the card never used to render', () => {
+    expect(topInsightBullets(insight({ insights: ['from the dead array'] })))
+      .toEqual(['from the dead array']);
+  });
+
+  it('drops duplicates across the three arrays', () => {
+    // The model routinely repeats a pattern as a recommendation, and two
+    // identical bullets would waste one of only five slots.
+    expect(topInsightBullets(insight({
+      patterns: ['Protein averaged 82g'], recommendations: ['Protein averaged 82g'],
+    }))).toEqual(['Protein averaged 82g']);
+  });
+
+  it('drops blanks and whitespace rather than rendering empty rows', () => {
+    expect(topInsightBullets(insight({ patterns: ['', '   ', 'real'] }))).toEqual(['real']);
+  });
+
+  it('survives a response missing the arrays entirely', () => {
+    expect(topInsightBullets({ headline: 'x' } as NutritionInsight)).toEqual([]);
   });
 });

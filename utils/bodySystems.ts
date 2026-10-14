@@ -19,7 +19,8 @@ import { NUTRIENT_INFO } from '../data/nutrientData';
  */
 
 export type BodySystemId =
-  | 'hair-nails' | 'skin' | 'muscle' | 'hormonal' | 'energy' | 'immune' | 'bone';
+  | 'hair-nails' | 'skin' | 'muscle' | 'hormonal' | 'energy' | 'immune' | 'bone'
+  | 'brain' | 'heart';
 
 export interface BodySystemDefinition {
   id: BodySystemId;
@@ -72,6 +73,22 @@ export const BODY_SYSTEMS: BodySystemDefinition[] = [
     label: 'Bone',
     blurb: 'Mineral density and the vitamins that direct calcium into bone.',
     nutrients: ['Calcium', 'Vitamin D', 'Vitamin K', 'Magnesium', 'Phosphorus', 'Manganese'],
+  },
+  {
+    id: 'brain',
+    label: 'Brain',
+    blurb: 'Nerve signalling, myelin, and the B-vitamins behind focus and memory.',
+    nutrients: ['Omega-3', 'Vitamin B12', 'Folate', 'Choline', 'Iron', 'Vitamin B6', 'Vitamin E'],
+  },
+  {
+    id: 'heart',
+    label: 'Heart',
+    blurb: 'Blood pressure, rhythm, and the fats circulating in your blood.',
+    // The first system to include a CEILING nutrient. Sodium's target is an
+    // upper limit, and nutrientPct already inverts ceilings, so a salty day
+    // lowers this score instead of raising it. Before this, Sodium was tracked
+    // and scored into nothing — it fed no system at all.
+    nutrients: ['Omega-3', 'Potassium', 'Magnesium', 'Fiber', 'Sodium', 'Vitamin D'],
   },
 ];
 
@@ -167,9 +184,22 @@ export const computeBodySystems = (
   };
 
   return BODY_SYSTEMS.map((system) => {
+    // Nothing logged for THIS system means nothing to assess — it does not mean
+    // "doing well on the limits". A ceiling scores full marks at zero intake,
+    // because being under the sodium limit is trivially true if you have eaten
+    // nothing, so Heart would read 17% support on an empty day — and
+    // BodySystems' `hasData` check asks whether any score is above 0, so that
+    // one ceiling would render the whole surface for a user who logged nothing.
+    //
+    // Scoped to this system's own nutrients rather than the whole day's intake:
+    // a global check would make Heart jump from 0 to 17 the moment the user
+    // logged protein, which Heart does not even contain.
+    const systemHasIntake = system.nutrients.some((n) => (Number(consumed[n]) || 0) > 0);
+
     const contributions = system.nutrients
       .map((n) => nutrientPct(n, consumed, targets))
       .filter((c): c is NutrientContribution => c !== null)
+      .map((c) => (systemHasIntake ? c : { ...c, pct: 0 }))
       .sort((a, b) => a.pct - b.pct);
 
     const score = contributions.length

@@ -116,7 +116,7 @@ describe('Coach — normal conversation', () => {
     await waitFor(() => expect(spy).toHaveBeenCalled());
     const [, ctx] = spy.mock.calls[0];
     expect(ctx.subject).toBe('Skin');
-    expect(ctx.systems.length).toBe(7);
+    expect(ctx.systems.length).toBe(9);
     expect(ctx.dailyCalorieTarget).toBe(2200);
   });
 

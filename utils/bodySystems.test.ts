@@ -91,16 +91,23 @@ describe('nutrientPct', () => {
 });
 
 describe('computeBodySystems', () => {
-  it('returns all seven systems', () => {
+  it('returns all nine systems', () => {
     const systems = computeBodySystems({}, targets, macros());
-    expect(systems).toHaveLength(7);
+    expect(systems).toHaveLength(9);
     expect(systems.map((s) => s.id)).toEqual([
       'hair-nails', 'skin', 'muscle', 'hormonal', 'energy', 'immune', 'bone',
+      'brain', 'heart',
     ]);
   });
 
   it('scores every system 0 with nothing logged', () => {
-    for (const s of computeBodySystems({}, targets, macros())) expect(s.score).toBe(0);
+    // Heart contains Sodium, a ceiling. Without the no-intake guard this system
+    // would score 17 on an empty day — "you are under your sodium limit" is
+    // true but meaningless when nothing has been eaten, and it would light up
+    // the whole Body surface for a user who has logged nothing.
+    for (const s of computeBodySystems({}, targets, macros())) {
+      expect(s.score, `${s.label} should be 0 with no intake`).toBe(0);
+    }
   });
 
   it('scores every system 100 when all its nutrients hit target', () => {
@@ -117,6 +124,16 @@ describe('computeBodySystems', () => {
       protein: targets.protein / 2, carbs: targets.carbs / 2, fat: targets.fat / 2,
     });
     for (const s of computeBodySystems(half, targets, halfMacros)) {
+      if (s.id === 'heart') {
+        // Heart is the one system containing a ceiling, and a ceiling does not
+        // scale linearly: half the sodium LIMIT is comfortably under it, so
+        // that contribution scores 100 rather than 50. Five goals at 50 plus
+        // one ceiling at 100 is 58, and that is the correct answer — expecting
+        // 50 here would mean expecting the app to treat a low-sodium day as
+        // only half as good as it is.
+        expect(s.score).toBe(58);
+        continue;
+      }
       expect(s.score, `${s.label} should be 50`).toBe(50);
     }
   });
@@ -220,7 +237,7 @@ describe('computeBodySystems — macros come from the macros argument', () => {
   it('survives a missing or malformed macros object', () => {
     for (const bad of [undefined, null, { protein: NaN }, { protein: '31g' }]) {
       const r = computeBodySystems({}, targets, bad as never);
-      expect(r).toHaveLength(7);
+      expect(r).toHaveLength(9);
       for (const s of r) expect(Number.isNaN(s.score)).toBe(false);
     }
   });
@@ -339,5 +356,58 @@ describe('computeLimitingNutrients', () => {
 
   it('returns nothing for a well-covered day', () => {
     expect(computeLimitingNutrients([sys('A', []), sys('B', [])])).toEqual([]);
+  });
+});
+
+describe('Heart is the first system built on a ceiling', () => {
+  /** A day meeting every goal target, with sodium set explicitly. */
+  const dayWithSodium = (sodium: number) => ({ ...perfect(), Sodium: sodium });
+
+  it('a salty day lowers Heart support', () => {
+    const under = computeBodySystems(dayWithSodium(1000), targets, fullMacros)
+      .find((s) => s.id === 'heart')!.score;
+    const over = computeBodySystems(dayWithSodium(4600), targets, fullMacros)
+      .find((s) => s.id === 'heart')!.score;
+    expect(over).toBeLessThan(under);
+  });
+
+  it('never tells anyone to eat more salt', () => {
+    // A low-sodium day puts Sodium at full marks, so it is not a gap. But even
+    // a day with zero sodium must not surface it as something to go and get:
+    // computeLimitingNutrients skips ceilings entirely.
+    const systems = computeBodySystems({ Sodium: 0, Potassium: 100 }, targets, macros());
+    const limiting = computeLimitingNutrients(systems);
+    expect(limiting.map((l) => l.nutrient)).not.toContain('Sodium');
+  });
+
+  it('counts sodium as satisfied when it is under the limit', () => {
+    const heart = computeBodySystems(dayWithSodium(1000), targets, fullMacros)
+      .find((s) => s.id === 'heart')!;
+    expect(heart.contributions.find((c) => c.nutrient === 'Sodium')!.pct).toBe(100);
+    expect(heart.gaps.map((g) => g.nutrient)).not.toContain('Sodium');
+  });
+
+  it('does not credit the ceiling when the system has no intake at all', () => {
+    const heart = computeBodySystems({}, targets, macros()).find((s) => s.id === 'heart')!;
+    expect(heart.score).toBe(0);
+    expect(heart.contributions.every((c) => c.pct === 0)).toBe(true);
+  });
+
+  it('is unaffected by intake belonging to other systems', () => {
+    // The guard is scoped per system. A global one would make Heart jump from
+    // 0 to 17 the moment any unrelated nutrient was logged.
+    const heart = computeBodySystems({ Biotin: 30 }, targets, macros()).find((s) => s.id === 'heart')!;
+    expect(heart.score).toBe(0);
+  });
+});
+
+describe('Brain', () => {
+  it('scores from the nutrients it names, and nothing else', () => {
+    const brain = computeBodySystems({ 'Vitamin B12': targets ? 2.4 : 2.4 }, targets, macros())
+      .find((s) => s.id === 'brain')!;
+    expect(brain.contributions.map((c) => c.nutrient).sort()).toEqual(
+      ['Choline', 'Folate', 'Iron', 'Omega-3', 'Vitamin B12', 'Vitamin B6', 'Vitamin E'].sort(),
+    );
+    expect(brain.contributions.find((c) => c.nutrient === 'Vitamin B12')!.pct).toBe(100);
   });
 });

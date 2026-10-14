@@ -9,6 +9,8 @@ import {
   DailyNutritionSummary,
   weightOnDate,
   sumMacros,
+  averagesForRange,
+  mostMissedNutrients,
 } from './nutritionAggregates';
 import { NUTRIENT_INFO } from '../data/nutrientData';
 import { MealLog, FoodItem } from '../types';
@@ -393,5 +395,115 @@ describe('every nutrient adds up — macros and all 28 micros', () => {
     const totals = sumMacros([log({ calories: '420 kcal' as unknown as number, protein: 10 })]);
     expect(totals.calories).toBe(0);
     expect(totals.protein).toBe(10);
+  });
+});
+
+describe('averagesForRange', () => {
+  const day = (over: Partial<DailyNutritionSummary>): DailyNutritionSummary => ({
+    label: 'Mon', dateKey: '2026-07-31', calories: 0, protein: 0,
+    carbs: 0, fat: 0, mealCount: 0, ...over,
+  });
+
+  it('divides by days logged, not days elapsed', () => {
+    // Four logged days inside a seven-day window. Dividing by 7 would report
+    // 1143 kcal to someone averaging 2000 on the days they actually ate.
+    const summaries = [
+      day({ calories: 2000, protein: 120, mealCount: 3 }),
+      day({ calories: 2000, protein: 120, mealCount: 3 }),
+      day({ calories: 2000, protein: 120, mealCount: 3 }),
+      day({ calories: 2000, protein: 120, mealCount: 3 }),
+      day({}), day({}), day({}),
+    ];
+    expect(averagesForRange(summaries)).toEqual({
+      daysLogged: 4, avgCalories: 2000, avgProtein: 120,
+    });
+  });
+
+  it('returns zeros rather than NaN when nothing is logged', () => {
+    expect(averagesForRange([day({}), day({})])).toEqual({
+      daysLogged: 0, avgCalories: 0, avgProtein: 0,
+    });
+    expect(averagesForRange([])).toEqual({ daysLogged: 0, avgCalories: 0, avgProtein: 0 });
+  });
+
+  it('coerces a string value to 0 instead of poisoning the average', () => {
+    const summaries = [
+      day({ calories: '2000' as unknown as number, protein: 100, mealCount: 1 }),
+      day({ calories: 1000, protein: 100, mealCount: 1 }),
+    ];
+    expect(Number.isFinite(averagesForRange(summaries).avgCalories)).toBe(true);
+  });
+});
+
+describe('mostMissedNutrients', () => {
+  const DAYS = ['2026-07-29', '2026-07-30', '2026-07-31'];
+
+  /** Every nutrient at its target, so only the overrides register as missed. */
+  const allMet = (over: Record<string, number> = {}) => ({
+    ...Object.fromEntries(
+      Object.keys(NUTRIENT_INFO)
+        .filter((k) => NUTRIENT_INFO[k].targetVal && !['Protein', 'Carbohydrates', 'Fats'].includes(k))
+        .map((k) => [k, NUTRIENT_INFO[k].targetVal!]),
+    ),
+    ...over,
+  });
+
+  it('ranks by how many logged days fell under half target', () => {
+    // Everything else is at target, so Iron (missed 3 days) and Vitamin C
+    // (missed 1) are the only entries and the ordering is unambiguous.
+    const logs = DAYS.map((d) =>
+      log({ micros: allMet({ Iron: 1, 'Vitamin C': d === '2026-07-31' ? 2 : 90 }) }, d));
+    const missed = mostMissedNutrients(logs, DAYS, 5);
+    expect(missed.map((m) => m.nutrient)).toEqual(['Iron', 'Vitamin C']);
+    expect(missed[0].daysMissed).toBe(3);
+    expect(missed[0].daysLogged).toBe(3);
+    expect(missed[1].daysMissed).toBe(1);
+  });
+
+  it('ignores days with no meals rather than counting them as missed', () => {
+    // One logged day in a three-day window. Counting the empty days would say
+    // every nutrient was missed three times out of three.
+    const logs = [log({ micros: { Iron: 1 } }, '2026-07-31')];
+    const missed = mostMissedNutrients(logs, DAYS, 5);
+    expect(missed[0].daysLogged).toBe(1);
+    expect(missed[0].daysMissed).toBe(1);
+  });
+
+  it('never lists a ceiling nutrient', () => {
+    // Being under the sodium limit is the goal. Listing it as "missed" would
+    // invert the advice into "eat more salt".
+    const logs = DAYS.map((d) => log({ micros: { Sodium: 10, Sugar: 1, Iron: 1 } }, d));
+    const names = mostMissedNutrients(logs, DAYS, 28).map((m) => m.nutrient);
+    expect(names).not.toContain('Sodium');
+    expect(names).not.toContain('Sugar');
+    expect(names).toContain('Iron');
+  });
+
+  it('leaves out nutrients that were always met', () => {
+    const logs = DAYS.map((d) => log({ micros: { Iron: 18, 'Vitamin C': 1 } }, d));
+    const names = mostMissedNutrients(logs, DAYS, 28).map((m) => m.nutrient);
+    expect(names).not.toContain('Iron');
+    expect(names).toContain('Vitamin C');
+  });
+
+  it('returns nothing when no day was logged', () => {
+    expect(mostMissedNutrients([], DAYS, 5)).toEqual([]);
+  });
+
+  it('respects the limit and orders stably on a tie', () => {
+    const logs = DAYS.map((d) => log({ micros: {} }, d));
+    const missed = mostMissedNutrients(logs, DAYS, 3);
+    expect(missed).toHaveLength(3);
+    // All tied at 3 missed and 0%, so the tiebreak is alphabetical.
+    expect(missed.map((m) => m.nutrient)).toEqual([...missed.map((m) => m.nutrient)].sort());
+  });
+
+  it('reports the average percentage of target', () => {
+    const logs = DAYS.map((d) => log({ micros: { Iron: 9 } }, d)); // 9 of 18 = 50%
+    const iron = mostMissedNutrients(logs, DAYS, 28).find((m) => m.nutrient === 'Iron');
+    // 50% is not UNDER the threshold, so Iron should not be listed at all.
+    expect(iron).toBeUndefined();
+    const lower = DAYS.map((d) => log({ micros: { Iron: 4.5 } }, d)); // 25%
+    expect(mostMissedNutrients(lower, DAYS, 28).find((m) => m.nutrient === 'Iron')!.avgPct).toBe(25);
   });
 });

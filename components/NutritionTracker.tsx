@@ -9,9 +9,10 @@ import { Field } from './ui/Field';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Button } from './ui/Button';
 import { MetricChipRail, metricsFromFood, metricsFromWater, type Metric } from './ui/MetricChip';
+import { StatTile } from './ui/StatTile';
 import { NUTRIENT_INFO, MICRO_KEYS } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
-import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, sumMacros, scoreFromConsumed, weightOnDate, PRIORITY_MICROS } from '../utils/nutritionAggregates';
+import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, sumMacros, scoreFromConsumed, weightOnDate, averagesForRange, mostMissedNutrients, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
 import { TrendCharts } from './TrendCharts';
 import { NutritionInsights } from './NutritionInsights';
@@ -75,6 +76,16 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
     () => getWeeklyMacroTotals(trendDailySummaries),
     [trendDailySummaries]
   );
+
+  // Both analytics cards follow the 7/14/30 selector, so they are derived from
+  // trendDailySummaries rather than from buildInsightsPayload, which is fixed
+  // at 7 days and shaped for the model rather than the screen.
+  const rangeAverages = useMemo(() => averagesForRange(trendDailySummaries), [trendDailySummaries]);
+  const missedNutrients = useMemo(
+    () => mostMissedNutrients(allFoodLogs, trendDailySummaries.map((d) => d.dateKey), 5),
+    [allFoodLogs, trendDailySummaries],
+  );
+
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingSunlight, setIsAddingSunlight] = useState(false);
   const [isMealBuilderOpen, setIsMealBuilderOpen] = useState(false);
@@ -296,7 +307,15 @@ const isViewingToday = selectedDate === toISODateString();
         onclone: (doc) => {
           const freeze = doc.createElement('style');
           freeze.textContent =
-            '*,*::before,*::after{animation:none!important;transition:none!important;}';
+            '*,*::before,*::after{animation:none!important;transition:none!important;}' +
+            // The Body tab is a two-column grid at lg and above, which is right
+            // for a screen and wrong for an A4 page — html2canvas captures at the
+            // live viewport width, so the export would inherit half-width columns
+            // and slice them across page breaks. Collapsing the clone back to one
+            // column keeps the PDF reading as it always has, while the screen
+            // keeps both columns.
+            '[data-report-root]{display:block!important;}' +
+            '[data-report-root]>*{grid-column:auto!important;margin-bottom:2rem;}';
           doc.head.appendChild(freeze);
         },
       });
@@ -548,7 +567,11 @@ const isViewingToday = selectedDate === toISODateString();
                 </div>
               )}
 
-              <div className="space-y-4">
+              {/* Two across from lg up. The rest of Today stays a single
+                  column — logging is a focused task and splitting the whole
+                  screen would work against it — but four stacked meal cards
+                  are the one part of this tab that is pure vertical scroll. */}
+              <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
                 {MEAL_TYPES.map(type => {
                   const mealLogs = logs.filter(l => l.type === type);
                   return (
@@ -680,6 +703,72 @@ const isViewingToday = selectedDate === toISODateString();
               }))}
             />
           </div>
+          {/* The two numbers people actually came for. Averages were already
+              computed for the AI payload and never shown; "what do I keep
+              missing" was answered nowhere — the daily gaps list only ever
+              described today. */}
+          {rangeAverages.daysLogged > 0 && (
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Card
+                title="Your averages"
+                description={`Across the ${rangeAverages.daysLogged} day${rangeAverages.daysLogged === 1 ? '' : 's'} you logged in this range.`}
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <StatTile
+                    label="Avg calories"
+                    value={rangeAverages.avgCalories.toLocaleString()}
+                    unit="kcal"
+                    tone="nutri"
+                    caption={`Target ${targets.calories.toLocaleString()}`}
+                  />
+                  <StatTile
+                    label="Avg protein"
+                    value={rangeAverages.avgProtein}
+                    unit="g"
+                    tone="spark"
+                    caption={`Target ${targets.protein}g`}
+                  />
+                </div>
+              </Card>
+
+              <Card
+                title="Most missed nutrients"
+                description="Days you came in under half your target. Ceilings like sodium are excluded."
+              >
+                {missedNutrients.length === 0 ? (
+                  <p className="text-sm text-fg-soft">
+                    Nothing consistently short in this range — you hit at least half your
+                    target on every nutrient, every logged day.
+                  </p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {missedNutrients.map((m) => (
+                      <li key={m.nutrient} className="flex items-center justify-between gap-3">
+                        <button
+                          onClick={() => setSelectedNutrient(m.nutrient)}
+                          className="text-left min-w-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri rounded-control"
+                        >
+                          <div className="font-semibold text-sm text-fg group-hover:text-nutri transition-colors truncate">
+                            {m.nutrient}
+                          </div>
+                          <div className="text-[11px] text-fg-mute truncate">
+                            {NUTRIENT_INFO[m.nutrient]?.sources.slice(0, 2).join(' · ')}
+                          </div>
+                        </button>
+                        <div className="text-right shrink-0">
+                          <div className="nums text-sm font-bold text-fat">
+                            {m.daysMissed}<span className="text-fg-mute font-medium"> of {m.daysLogged}</span>
+                          </div>
+                          <div className="nums text-[11px] text-fg-mute">avg {m.avgPct}% DV</div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
+          )}
+
           <TrendCharts
             dailySummaries={trendDailySummaries}
             weeklyTotals={trendTotals}
@@ -693,17 +782,28 @@ const isViewingToday = selectedDate === toISODateString();
 
       {activeTab === 'analysis' && (
         <div className="animate-fade-in space-y-8">
-          <div ref={reportRef} className="space-y-8">
+          {/* Two columns from lg up. `items-start` stops a short card being
+              stretched to its tallest sibling's height. The grid is reset to a
+              single column inside the PDF clone — see `export-single-col`. */}
+          <div
+            ref={reportRef}
+            data-report-root
+            className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start"
+          >
 
            {/* Body-system support leads the tab: it is the surface that makes
                the raw percentages below legible. Inside reportRef so the
-               exported PDF leads with it too. Deterministic, no AI call. */}
+               exported PDF leads with it too. Deterministic, no AI call.
+               Spans both columns — it has nine rings in its own grid and would
+               be cramped at half width. */}
+           <div className="lg:col-span-2">
            <BodySystems
              consumedMicros={consumedMicros}
              consumedMacros={consumedMacros}
              targets={targets}
              onAskCoach={(subject, systems) => setCoach({ subject, systems })}
            />
+           </div>
 
            {/* ── Daily Summary (water + weight) — included in PDF export ── */}
            <Card title="Daily Summary">
@@ -915,8 +1015,8 @@ const isViewingToday = selectedDate === toISODateString();
              <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
            </Card>
 
-           <Card title="Micronutrient Breakdown">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+           <Card title="Micronutrient Breakdown" className="lg:col-span-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                  {/* Fiber is excluded because it has its own progress bar above,
                      with the macros where it belongs — not because it is
                      untracked. Sugar and Sodium ARE here: both are ceilings, and
@@ -949,7 +1049,10 @@ const isViewingToday = selectedDate === toISODateString();
               </div>
            </Card>
 
-           <section className="rounded-card border border-edge shadow-e1 overflow-hidden">
+           {/* Spans both columns: on a bad day this lists ten nutrients, and in
+               a half-width column that was a 1600px ribbon with dead space
+               beside it. Full width lets the gaps themselves sit two across. */}
+           <section className="rounded-card border border-edge shadow-e1 overflow-hidden lg:col-span-2">
               {nutrientGaps.length > 0 ? (
                 <>
                   <div className="bg-gradient-to-r from-spark to-fat px-6 py-4">
@@ -958,7 +1061,7 @@ const isViewingToday = selectedDate === toISODateString();
                       Priority nutrients below 50% of your daily target
                     </p>
                   </div>
-                  <div className="bg-spark/5 p-6 space-y-4">
+                  <div className="bg-spark/5 p-6 space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4 sm:items-start">
                     {nutrientGaps.map(({ key, displayPct, sources }) => (
                       <div
                         key={key}
