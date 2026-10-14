@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { GamificationState } from '../types';
 import { PlanDisplay } from './PlanDisplay';
 import { Button } from './ui/Button';
@@ -7,7 +7,7 @@ import { BADGE_MAP } from '../data/badgeDefinitions';
 import { ScoreRing } from './ui/ScoreRing';
 import { Modal } from './ui/Modal';
 import { GoalPanel } from './GoalPanel';
-import { QuestList } from './panels/QuestList';
+import { AvatarPanel } from './panels/AvatarPanel';
 import { WeightPanel } from './panels/WeightPanel';
 import { ExercisePanel } from './panels/ExercisePanel';
 import { AchievementsPanel } from './panels/AchievementsPanel';
@@ -18,6 +18,7 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { useProfile } from '../contexts/ProfileContext';
 import { useTargets } from '../contexts/useTargets';
 import { useLogs } from '../contexts/LogsContext';
+import { AVATAR_ACHIEVEMENTS } from '../utils/avatar';
 import {
   IconFlame, IconApple, IconBowl, IconHeartbeat, IconTargetArrow,
   IconMessageCircle, IconUserCircle, IconX,
@@ -56,22 +57,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showProfile, setShowProfile] = useState(false);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
 
-  const completeQuest = (questId: string, xpReward: number) => {
-    if (gamification.completedQuestIds.includes(questId)) return;
-    const newXp = gamification.xp + xpReward;
-    const newLevel = Math.floor(newXp / 100) + 1;
+  /**
+   * Credit an avatar achievement.
+   *
+   * This replaces completeQuest, which was the app's main XP source — removing
+   * the quest checklist without it would have frozen levels for anyone who only
+   * logs food, and made the `first-steps` and `quest-master` badges
+   * permanently unreachable.
+   *
+   * It keeps writing to `completedQuestIds` on purpose: that field already
+   * resets daily via resetQuestsIfNewDay, so "once per day" needs no new
+   * persistence and no schema migration for existing users.
+   */
+  const awardAchievement = useCallback((achievements: { id: string; xp: number }[]) => {
+    // Applied as ONE update. Calling this per achievement computed each new
+    // state from the same stale `gamification`, so awards landing together
+    // overwrote each other and a perfect day paid 65 XP instead of 120.
+    const fresh = achievements.filter((a) => !gamification.completedQuestIds.includes(a.id));
+    if (fresh.length === 0) return;
+
+    const newXp = gamification.xp + fresh.reduce((sum, a) => sum + a.xp, 0);
     const newState: GamificationState = {
       ...gamification,
       xp: newXp,
-      level: newLevel,
-      completedQuestIds: [...gamification.completedQuestIds, questId],
+      level: Math.floor(newXp / 100) + 1,
+      completedQuestIds: [...gamification.completedQuestIds, ...fresh.map((a) => a.id)],
     };
-    onUpdateGamification(newState, 1);
-  };
+    onUpdateGamification(newState, fresh.length);
+  }, [gamification, onUpdateGamification]);
 
 
-  // The plan comes from the AI, so never assume its arrays are present.
-  const dailyQuests = plan.dailyQuests ?? [];
 
 
   const caloriesConsumed = foodLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0);
@@ -149,7 +164,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         className="grid grid-cols-4 gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0"
         segmentClassName="relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm whitespace-nowrap"
         segments={TABS.map(({ id, label, Icon }) => {
-          const remaining = dailyQuests.length - gamification.completedQuestIds.length;
+          const remaining = AVATAR_ACHIEVEMENTS.length - gamification.completedQuestIds.length;
           return {
             value: id,
             label: (
@@ -189,9 +204,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <ExercisePanel />
           </div>
 
-          {/* Quests are today's actions toward the goal, not free-floating
-              gamification — which is why they live here rather than in a tab. */}
-          <QuestList dailyQuests={dailyQuests} gamification={gamification} completeQuest={completeQuest} />
+          {/* The character replaced the quest checklist. Same slot, same XP,
+              but it reads from what was actually logged rather than asking the
+              user to tick a box the app could have checked itself. */}
+          <AvatarPanel gamification={gamification} onAward={awardAchievement} />
 
           {/* Trend charts + AI weekly insights (was the Trends sub-tab).
               Spans both columns: the charts need the width more than anything

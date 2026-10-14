@@ -185,26 +185,45 @@ describe('Goal', () => {
     expect(screen.getByText('Your Goal')).toBeInTheDocument();
   });
 
-  it('absorbs the quests that were their own tab', async () => {
+  // The quest checklist was replaced by the character in the same slot. These
+  // assert the REPLACEMENT rather than being deleted, because the quest list
+  // was the app's only XP source and the thing most likely to go quietly dead.
+  it('puts the character where the quest list used to be', async () => {
     const { user } = renderDashboard();
     await user.click(tab(/Goal/));
-    expect(screen.getByText("Today's Goals")).toBeInTheDocument();
-    expect(screen.getByText('Hit Protein Target')).toBeInTheDocument();
+    expect(screen.getByText('Your character')).toBeInTheDocument();
+    expect(screen.queryByText("Today's Goals")).not.toBeInTheDocument();
   });
 
-  it('still awards XP for completing a quest', async () => {
+  it('still awards XP, now from logged data rather than a click', async () => {
     const onUpdateGamification = vi.fn();
-    const { user } = renderDashboard({ gamification: aGamification({ xp: 120 }), onUpdateGamification });
+    const { user } = renderDashboard({
+      gamification: aGamification({ xp: 120, completedQuestIds: [] }),
+      onUpdateGamification,
+      // Enough food to clear the "logged a real day" threshold on its own.
+      foodLogs: [aMealLog({ food: aFood({ calories: 1800, protein: 130 }) })],
+    });
     await user.click(tab(/Goal/));
-    await user.click(screen.getByText('Hit Protein Target'));
+    expect(onUpdateGamification).toHaveBeenCalled();
     const [state, delta] = onUpdateGamification.mock.calls[0];
-    expect(state.xp).toBe(150);
-    expect(delta).toBe(1);
+    expect(state.xp).toBeGreaterThan(120);
+    // The delta is the number of achievements credited, which is what feeds
+    // lifetimeQuestsCompleted and so the `quest-master` badge at 25.
+    expect(delta).toBe(state.completedQuestIds.length);
+    expect(delta).toBeGreaterThanOrEqual(1);
   });
 
-  it('badges the Goal tab with remaining quests', () => {
-    renderDashboard();
-    expect(within(tab(/Goal/)).getByText('2')).toBeInTheDocument();
+  it('awards nothing when nothing has been logged', async () => {
+    const onUpdateGamification = vi.fn();
+    const { user } = renderDashboard({ gamification: aGamification({ xp: 0 }), onUpdateGamification, foodLogs: [] });
+    await user.click(tab(/Goal/));
+    expect(onUpdateGamification).not.toHaveBeenCalled();
+  });
+
+  it('badges the Goal tab with achievements still available today', () => {
+    renderDashboard({ gamification: aGamification({ completedQuestIds: ['avatar-fed'] }) });
+    // Five achievements, one already credited.
+    expect(within(tab(/Goal/)).getByText('4')).toBeInTheDocument();
   });
 
   it('keeps weight logging reachable', async () => {
@@ -353,5 +372,41 @@ describe('Goal-driven calorie target', () => {
     const headerTarget = screen.getByText('kcal eaten').previousElementSibling!.textContent!;
     const target = Number(headerTarget.split('/')[1].trim());
     expect(target + 0).toBe(remaining()); // nothing eaten in the fixture
+  });
+});
+
+describe('achievement XP is credited exactly once and in full', () => {
+  it('pays the full value when several land at the same time', async () => {
+    // The bug this guards: awarding one at a time computed each new state from
+    // the same stale gamification object, so a perfect day paid 65 of its 120.
+    const onUpdateGamification = vi.fn();
+    const { user } = renderDashboard({
+      gamification: aGamification({ xp: 0, completedQuestIds: [] }),
+      onUpdateGamification,
+      foodLogs: [aMealLog({ food: aFood({ calories: 2000, protein: 130, micros: {} }) })],
+      waterLog: { date: TODAY, mlConsumed: 4000 },
+    });
+    await user.click(tab(/Goal/));
+
+    const [state, delta] = onUpdateGamification.mock.calls[0];
+    // Every id credited in that call is distinct, and the XP is their sum.
+    expect(new Set(state.completedQuestIds).size).toBe(state.completedQuestIds.length);
+    expect(delta).toBe(state.completedQuestIds.length);
+    expect(state.xp).toBeGreaterThanOrEqual(55);
+  });
+
+  it('does not re-award an achievement already credited today', async () => {
+    const onUpdateGamification = vi.fn();
+    const { user } = renderDashboard({
+      gamification: aGamification({
+        xp: 200,
+        completedQuestIds: ['avatar-fed', 'avatar-protein', 'avatar-hydrated', 'avatar-nourished', 'avatar-radiant'],
+      }),
+      onUpdateGamification,
+      foodLogs: [aMealLog({ food: aFood({ calories: 2000, protein: 130 }) })],
+      waterLog: { date: TODAY, mlConsumed: 4000 },
+    });
+    await user.click(tab(/Goal/));
+    expect(onUpdateGamification).not.toHaveBeenCalled();
   });
 });

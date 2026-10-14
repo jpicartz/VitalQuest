@@ -16,7 +16,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     id: 'first-steps',
     Icon: IconShoe,
     title: 'First Steps',
-    description: 'Completed your very first quest.',
+    description: 'Earned your first achievement.',
   },
   {
     id: 'century',
@@ -46,7 +46,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     id: 'quest-master',
     Icon: IconTargetArrow,
     title: 'Quest Master',
-    description: 'Completed 25 quests in total.',
+    description: 'Earned 25 achievements in total.',
   },
   {
     id: 'hydration-hero',

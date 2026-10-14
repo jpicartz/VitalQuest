@@ -14,7 +14,9 @@ import { NUTRIENT_INFO, MICRO_KEYS } from '../data/nutrientData';
 import { parseFoodLog, suggestMeals } from '../services/claudeService';
 import { getLastNDaysSummaries, getWeeklyMacroTotals, computeConsumedMicros, sumMacros, scoreFromConsumed, weightOnDate, averagesForRange, mostMissedNutrients, PRIORITY_MICROS } from '../utils/nutritionAggregates';
 import { toISODateString, addDaysISO, formatNavigatorLabel } from '../utils/dateUtils';
+import { computeStatSeries, computeConsistency } from '../utils/nutritionStats';
 import { TrendCharts } from './TrendCharts';
+import { StatTrends } from './StatTrends';
 import { NutritionInsights } from './NutritionInsights';
 import { RecipeModal } from './RecipeModal';
 import { RecipeBuilderModal } from './RecipeBuilderModal';
@@ -84,6 +86,19 @@ export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
   const missedNutrients = useMemo(
     () => mostMissedNutrients(allFoodLogs, trendDailySummaries.map((d) => d.dateKey), 5),
     [allFoodLogs, trendDailySummaries],
+  );
+
+  const rangeDateKeys = useMemo(
+    () => trendDailySummaries.map((d) => d.dateKey),
+    [trendDailySummaries],
+  );
+  const statSeries = useMemo(
+    () => computeStatSeries(allFoodLogs, rangeDateKeys, profile),
+    [allFoodLogs, rangeDateKeys, profile],
+  );
+  const consistency = useMemo(
+    () => computeConsistency(allFoodLogs, rangeDateKeys, targets.calories),
+    [allFoodLogs, rangeDateKeys, targets.calories],
   );
 
   const [isAdding, setIsAdding] = useState(false);
@@ -774,6 +789,8 @@ const isViewingToday = selectedDate === toISODateString();
               </Card>
             </div>
           )}
+
+          <StatTrends series={statSeries} consistency={consistency} rangeDays={rangeDays} />
 
           <TrendCharts
             dailySummaries={trendDailySummaries}
