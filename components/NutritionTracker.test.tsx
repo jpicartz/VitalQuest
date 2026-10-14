@@ -268,3 +268,23 @@ describe('a ceiling nutrient is never presented as a goal', () => {
     }
   });
 });
+
+describe('a ceiling is never celebrated', () => {
+  it('does not list sodium or sugar under "You’re nailing these"', () => {
+    renderWithApp(<NutritionTracker view="analysis" />, {
+      foodLogs: [aMealLog({
+        food: aFood({
+          name: 'Instant ramen and a soda',
+          calories: 700, protein: 12, carbs: 110, fat: 20,
+          // Both ceilings well over the limit, and one real goal nutrient met.
+          micros: { Sodium: 3450, Sugar: 75, 'Vitamin C': 95 },
+        }),
+      })],
+    });
+    const nailed = screen.getByText(/nailing these/i).closest('div')!.parentElement!;
+    expect(within(nailed).getByText('Vitamin C')).toBeInTheDocument();
+    // 3450mg of a 2300mg limit is not an achievement.
+    expect(within(nailed).queryByText('Sodium')).not.toBeInTheDocument();
+    expect(within(nailed).queryByText('Sugar')).not.toBeInTheDocument();
+  });
+});

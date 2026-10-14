@@ -145,10 +145,16 @@ const isViewingToday = selectedDate === toISODateString();
   const microScore = scoreFromConsumed(consumedMicros);
 
   // Find "nailed" nutrients (>= 100% of target)
-  const nailedNutrients = Object.keys(NUTRIENT_INFO)
+  const nailedNutrients = MICRO_KEYS
     .filter(key => {
       const info = NUTRIENT_INFO[key];
       if (!info || !info.targetVal) return false;
+      // Ceilings are excluded. `current >= target` means the OPPOSITE thing for
+      // them, so a day at 3450mg sodium and 60g sugar was listed under
+      // "You're nailing these" — the app congratulating someone for being 50%
+      // over both limits. Same error as the breakdown tiles once had, in a
+      // surface the tile fix did not touch.
+      if (info.direction === 'ceiling') return false;
       const current = consumedMicros[key] || 0;
       return current >= info.targetVal;
     });
@@ -314,8 +320,8 @@ const isViewingToday = selectedDate === toISODateString();
             // and slice them across page breaks. Collapsing the clone back to one
             // column keeps the PDF reading as it always has, while the screen
             // keeps both columns.
-            '[data-report-root]{display:block!important;}' +
-            '[data-report-root]>*{grid-column:auto!important;margin-bottom:2rem;}';
+            '[data-report-cols]{display:block!important;}' +
+            '[data-report-cols]>*{margin-bottom:2rem;}';
           doc.head.appendChild(freeze);
         },
       });
@@ -782,240 +788,256 @@ const isViewingToday = selectedDate === toISODateString();
 
       {activeTab === 'analysis' && (
         <div className="animate-fade-in space-y-8">
-          {/* Two columns from lg up. `items-start` stops a short card being
-              stretched to its tallest sibling's height. The grid is reset to a
-              single column inside the PDF clone — see `export-single-col`. */}
-          <div
-            ref={reportRef}
-            data-report-root
-            className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start"
-          >
+          {/* A plain stack. The two-column area is the `data-report-cols`
+              wrapper below, so full-width surfaces stay full width without
+              needing a span, and the PDF clone flattens only that wrapper. */}
+          <div ref={reportRef} data-report-root className="space-y-8">
 
            {/* Body-system support leads the tab: it is the surface that makes
                the raw percentages below legible. Inside reportRef so the
                exported PDF leads with it too. Deterministic, no AI call.
-               Spans both columns — it has nine rings in its own grid and would
-               be cramped at half width. */}
-           <div className="lg:col-span-2">
+               Full width: it has nine rings in its own grid. */}
            <BodySystems
              consumedMicros={consumedMicros}
              consumedMacros={consumedMacros}
              targets={targets}
              onAskCoach={(subject, systems) => setCoach({ subject, systems })}
            />
-           </div>
 
-           {/* ── Daily Summary (water + weight) — included in PDF export ── */}
-           <Card title="Daily Summary">
-             <div className="grid grid-cols-2 gap-4">
-               {/* Water */}
-               <div className="bg-hydro/10 rounded-tile p-4">
-                 <p className="inline-flex items-center gap-1 text-xs font-semibold text-hydro uppercase tracking-widest mb-1"><IconDroplet size={13} /> Water</p>
-                 {/* Only one day of water is stored (waterLog is a single
-                     {date, mlConsumed}), so a past day has no figure to show.
-                     It used to render today's number regardless of the date
-                     being viewed, which made a past report quietly wrong. */}
-                 {waterLog.date === selectedDate ? (
-                   <>
-                     <p className="nums text-2xl font-bold text-hydro">{waterLog.mlConsumed} <span className="text-sm font-normal opacity-70">/ {Math.min(Math.round(profile.weightKg * 35), 3500)} ml</span></p>
-                     <div className="h-1.5 bg-hydro/20 rounded-full mt-2 overflow-hidden">
-                       <div className="h-full bg-hydro rounded-full" style={{ width: `${Math.min(Math.round((waterLog.mlConsumed / Math.min(Math.round(profile.weightKg * 35), 3500)) * 100), 100)}%` }} />
-                     </div>
-                   </>
-                 ) : (
-                   <p className="text-sm text-fg-mute italic mt-1">Only tracked for today</p>
-                 )}
+           {/* Two independent column stacks, NOT a row-based grid.
+
+               Auto-placement fills row by row and sizes each row to its
+               tallest card, so a short card leaves a hole beneath it and an
+               odd number of cards leaves a whole empty cell. Measured at
+               1440px that was 874px of dead space: 155 under Daily Summary,
+               413 under Micronutrient Score, and 306 beside Macro Targets
+               sitting alone in a two-column row.
+
+               Two stacks pack tightly instead, and the split is by subject
+               rather than by arithmetic: micronutrients on the left, energy
+               and the day on the right. Their heights happen to land within
+               ~10px of each other, which is why this grouping was chosen over
+               the several others that also balanced. */}
+           <div
+             data-report-cols
+             className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start"
+           >
+             <div className="space-y-8">
+             <section className="p-6 rounded-modal text-white shadow-lg" style={{background: 'linear-gradient(135deg, #16a34a, #15803d)'}}>
+               <div className="flex justify-between items-center mb-4">
+                  <div><h3 className="text-xl font-bold">Micronutrient Score</h3></div>
+                  <div className="nums text-5xl font-bold">{microScore}</div>
                </div>
-               {/* Weight */}
-               <div className="bg-raised rounded-tile p-4">
-                 <p className="inline-flex items-center gap-1 text-xs font-semibold text-fg-mute uppercase tracking-widest mb-1"><IconScale size={13} /> Weight</p>
-                 {/* The weight in force on the day being viewed, not the most
-                     recent weigh-in: a report for last Tuesday was showing
-                     today's weight. */}
-                 {weightOnSelectedDate !== null ? (
-                   <>
-                     <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(weightOnSelectedDate, weightUnit)} <span className="text-sm font-normal text-fg-mute">{weightUnit}</span></p>
-                     {weightHistory.length > 1 && (() => {
-                       const baseline = (weightHistory.find(e => e.isBaseline) ?? weightHistory[0]).kg;
-                       const current = weightOnSelectedDate;
-                       const delta = +(current - baseline).toFixed(1);
-                       return (
-                         <p className={`nums text-xs font-bold mt-1 ${delta < 0 ? 'text-nutri' : delta > 0 ? 'text-spark' : 'text-fg-mute'}`}>
-                           {delta > 0 ? '+' : ''}{toDisplayWeight(delta, weightUnit)} {weightUnit} from start
-                         </p>
-                       );
-                     })()}
-                   </>
-                 ) : (
-                   <p className="text-sm text-fg-mute italic mt-1">Not logged yet</p>
-                 )}
+               <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-6">
+                  <div className="h-full bg-white/90 transition-all duration-1000" style={{ width: `${microScore}%` }} />
                </div>
-             </div>
-           </Card>
 
-           {/* ── Macro donut chart ── */}
-           {(() => {
-             const proteinKcal = Math.round(consumedMacros.protein * 4);
-             const carbsKcal   = Math.round(consumedMacros.carbs * 4);
-             const fatKcal     = Math.round(consumedMacros.fat * 9);
-             const totalKcal   = proteinKcal + carbsKcal + fatKcal;
-             // Concrete hex (not CSS vars) so the SVG fill renders in Safari too; these vivid hues read on both light and dark.
-             const COLORS = ['#22c55e', '#f59e0b', '#f43f5e'];
-             const macroSlices = [
-               { name: 'Protein',  kcal: proteinKcal, grams: Math.round(consumedMacros.protein), color: COLORS[0] },
-               { name: 'Carbs',    kcal: carbsKcal,   grams: Math.round(consumedMacros.carbs),   color: COLORS[1] },
-               { name: 'Fat',      kcal: fatKcal,     grams: Math.round(consumedMacros.fat),     color: COLORS[2] },
-             ];
-             const hasData = totalKcal > 0;
-             // The logged calorie figure and the macro grams come from the same
-             // AI response but are not derived from each other, so they rarely
-             // agree exactly: fibre, alcohol and rounding all land in the gap.
-             // Showing 900 here and 1000 on Today with both labelled "kcal" was
-             // the bug — the numbers are fine, the silence about them was not.
-             const loggedKcal = Math.round(consumedMacros.calories);
-             const unaccounted = loggedKcal - totalKcal;
-             // 2% or 20 kcal, whichever is larger: below that it is rounding.
-             const materialGap = Math.abs(unaccounted) > Math.max(20, loggedKcal * 0.02);
+               {nailedNutrients.length > 0 && (
+                  <div className="bg-white/10 p-4 rounded-tile backdrop-blur-sm border border-white/20">
+                      <h4 className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-white/70 mb-2"><IconFlame size={14} /> You're nailing these:</h4>
+                      <div className="flex flex-wrap gap-2">
+                          {nailedNutrients.map(n => (
+                              <span key={n} className="bg-white/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                                  <IconCheck size={13} stroke={3} /> {n}
+                              </span>
+                          ))}
+                      </div>
+                  </div>
+               )}
+               {nailedNutrients.length === 0 && (
+                  <div className="text-sm text-white/70 italic">
+                    Track more nutrient-dense whole foods to see your essential wins here!
+                  </div>
+               )}
+             </section>
 
-             return (
-               <Card
-                 title="Calorie Breakdown"
-                 description={`How today's ${loggedKcal} logged kcal split across the macros.`}
-               >
-                 {hasData ? (
-                   <div className="flex flex-col sm:flex-row items-center gap-6">
-                     <div className="relative w-44 h-44 shrink-0">
-                       <ResponsiveContainer width="100%" height="100%">
-                         <PieChart>
-                           <Pie data={macroSlices.filter(s => s.kcal > 0)} dataKey="kcal"
-                             cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={3} startAngle={90} endAngle={-270}>
-                             {macroSlices.filter(s => s.kcal > 0).map(s => (
-                               <Cell key={s.name} fill={s.color} stroke="none" />
-                             ))}
-                           </Pie>
-                           <Tooltip formatter={(v: number) => [`${v} kcal`]} />
-                         </PieChart>
-                       </ResponsiveContainer>
-                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                         <span className="nums text-2xl font-bold text-fg">{totalKcal}</span>
-                         <span className="text-xs text-fg-mute font-medium">kcal from macros</span>
+             {/* Priority-nutrient bars. Lived in Trends in v1; it answers
+                 "how am I doing today?", not "how has the week gone?" ── */}
+             <Card title="Micronutrient Snapshot">
+               <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
+               <div className="space-y-4">
+                 {PRIORITY_MICROS.map((key) => {
+                   const info = NUTRIENT_INFO[key];
+                   if (!info?.targetVal) return null;
+                   const current = consumedMicros[key] || 0;
+                   const pct = Math.round((current / info.targetVal) * 100);
+                   const barPct = Math.min(pct, 100);
+                   const colorClass =
+                     pct >= 80 ? 'bg-nutri' : pct >= 40 ? 'bg-spark' : 'bg-fat';
+                   const displayAmount =
+                     current > 0 ? Math.round(current * 10) / 10 : 0;
+
+                   return (
+                     <div key={key}>
+                       <div className="flex justify-between items-baseline gap-3 mb-1.5">
+                         <span className="text-sm font-semibold text-fg">{key}</span>
+                         <span className="nums text-xs text-fg-soft shrink-0">
+                           {displayAmount}
+                           {info.unit}
+                           <span className="mx-1 text-fg-mute">·</span>
+                           <span className={`font-bold ${pct >= 80 ? 'text-nutri' : pct >= 40 ? 'text-spark' : 'text-fat'}`}>
+                             {pct}% DV
+                           </span>
+                         </span>
+                       </div>
+                       <div className="h-2.5 bg-track rounded-full overflow-hidden">
+                         <div
+                           className={`h-full transition-all duration-500 ${colorClass}`}
+                           style={{ width: `${barPct}%` }}
+                         />
                        </div>
                      </div>
-                     <div className="flex flex-col gap-3 flex-1 w-full">
-                       {macroSlices.map(s => (
-                         <div key={s.name} className="flex items-center gap-3">
-                           <div className="w-3 h-3 rounded-full shrink-0" style={{ background: s.color }} />
-                           <span className="text-sm font-semibold text-fg w-16">{s.name}</span>
-                           <div className="flex-1 h-2 bg-track rounded-full overflow-hidden">
-                             <div className="h-full rounded-full transition-all duration-500"
-                               style={{ width: `${totalKcal > 0 ? Math.round((s.kcal / totalKcal) * 100) : 0}%`, background: s.color }} />
-                           </div>
-                           <span className="nums text-sm font-bold text-fg-soft w-12 text-right">{s.grams}g</span>
-                           <span className="nums text-xs text-fg-mute w-8 text-right">{totalKcal > 0 ? Math.round((s.kcal / totalKcal) * 100) : 0}%</span>
+                   );
+                 })}
+               </div>
+             </Card>
+             </div>
+
+             <div className="space-y-8">
+             {/* ── Daily Summary (water + weight) — included in PDF export ── */}
+             <Card title="Daily Summary">
+               <div className="grid grid-cols-2 gap-4">
+                 {/* Water */}
+                 <div className="bg-hydro/10 rounded-tile p-4">
+                   <p className="inline-flex items-center gap-1 text-xs font-semibold text-hydro uppercase tracking-widest mb-1"><IconDroplet size={13} /> Water</p>
+                   {/* Only one day of water is stored (waterLog is a single
+                       {date, mlConsumed}), so a past day has no figure to show.
+                       It used to render today's number regardless of the date
+                       being viewed, which made a past report quietly wrong. */}
+                   {waterLog.date === selectedDate ? (
+                     <>
+                       <p className="nums text-2xl font-bold text-hydro">{waterLog.mlConsumed} <span className="text-sm font-normal opacity-70">/ {Math.min(Math.round(profile.weightKg * 35), 3500)} ml</span></p>
+                       <div className="h-1.5 bg-hydro/20 rounded-full mt-2 overflow-hidden">
+                         <div className="h-full bg-hydro rounded-full" style={{ width: `${Math.min(Math.round((waterLog.mlConsumed / Math.min(Math.round(profile.weightKg * 35), 3500)) * 100), 100)}%` }} />
+                       </div>
+                     </>
+                   ) : (
+                     <p className="text-sm text-fg-mute italic mt-1">Only tracked for today</p>
+                   )}
+                 </div>
+                 {/* Weight */}
+                 <div className="bg-raised rounded-tile p-4">
+                   <p className="inline-flex items-center gap-1 text-xs font-semibold text-fg-mute uppercase tracking-widest mb-1"><IconScale size={13} /> Weight</p>
+                   {/* The weight in force on the day being viewed, not the most
+                       recent weigh-in: a report for last Tuesday was showing
+                       today's weight. */}
+                   {weightOnSelectedDate !== null ? (
+                     <>
+                       <p className="nums text-2xl font-bold text-fg">{toDisplayWeight(weightOnSelectedDate, weightUnit)} <span className="text-sm font-normal text-fg-mute">{weightUnit}</span></p>
+                       {weightHistory.length > 1 && (() => {
+                         const baseline = (weightHistory.find(e => e.isBaseline) ?? weightHistory[0]).kg;
+                         const current = weightOnSelectedDate;
+                         const delta = +(current - baseline).toFixed(1);
+                         return (
+                           <p className={`nums text-xs font-bold mt-1 ${delta < 0 ? 'text-nutri' : delta > 0 ? 'text-spark' : 'text-fg-mute'}`}>
+                             {delta > 0 ? '+' : ''}{toDisplayWeight(delta, weightUnit)} {weightUnit} from start
+                           </p>
+                         );
+                       })()}
+                     </>
+                   ) : (
+                     <p className="text-sm text-fg-mute italic mt-1">Not logged yet</p>
+                   )}
+                 </div>
+               </div>
+             </Card>
+
+             {/* ── Macro donut chart ── */}
+             {(() => {
+               const proteinKcal = Math.round(consumedMacros.protein * 4);
+               const carbsKcal   = Math.round(consumedMacros.carbs * 4);
+               const fatKcal     = Math.round(consumedMacros.fat * 9);
+               const totalKcal   = proteinKcal + carbsKcal + fatKcal;
+               // Concrete hex (not CSS vars) so the SVG fill renders in Safari too; these vivid hues read on both light and dark.
+               const COLORS = ['#22c55e', '#f59e0b', '#f43f5e'];
+               const macroSlices = [
+                 { name: 'Protein',  kcal: proteinKcal, grams: Math.round(consumedMacros.protein), color: COLORS[0] },
+                 { name: 'Carbs',    kcal: carbsKcal,   grams: Math.round(consumedMacros.carbs),   color: COLORS[1] },
+                 { name: 'Fat',      kcal: fatKcal,     grams: Math.round(consumedMacros.fat),     color: COLORS[2] },
+               ];
+               const hasData = totalKcal > 0;
+               // The logged calorie figure and the macro grams come from the same
+               // AI response but are not derived from each other, so they rarely
+               // agree exactly: fibre, alcohol and rounding all land in the gap.
+               // Showing 900 here and 1000 on Today with both labelled "kcal" was
+               // the bug — the numbers are fine, the silence about them was not.
+               const loggedKcal = Math.round(consumedMacros.calories);
+               const unaccounted = loggedKcal - totalKcal;
+               // 2% or 20 kcal, whichever is larger: below that it is rounding.
+               const materialGap = Math.abs(unaccounted) > Math.max(20, loggedKcal * 0.02);
+
+               return (
+                 <Card
+                   title="Calorie Breakdown"
+                   description={`How today's ${loggedKcal} logged kcal split across the macros.`}
+                 >
+                   {hasData ? (
+                     <div className="flex flex-col sm:flex-row items-center gap-6">
+                       <div className="relative w-44 h-44 shrink-0">
+                         <ResponsiveContainer width="100%" height="100%">
+                           <PieChart>
+                             <Pie data={macroSlices.filter(s => s.kcal > 0)} dataKey="kcal"
+                               cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={3} startAngle={90} endAngle={-270}>
+                               {macroSlices.filter(s => s.kcal > 0).map(s => (
+                                 <Cell key={s.name} fill={s.color} stroke="none" />
+                               ))}
+                             </Pie>
+                             <Tooltip formatter={(v: number) => [`${v} kcal`]} />
+                           </PieChart>
+                         </ResponsiveContainer>
+                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                           <span className="nums text-2xl font-bold text-fg">{totalKcal}</span>
+                           <span className="text-xs text-fg-mute font-medium">kcal from macros</span>
                          </div>
-                       ))}
+                       </div>
+                       <div className="flex flex-col gap-3 flex-1 w-full">
+                         {macroSlices.map(s => (
+                           <div key={s.name} className="flex items-center gap-3">
+                             <div className="w-3 h-3 rounded-full shrink-0" style={{ background: s.color }} />
+                             <span className="text-sm font-semibold text-fg w-16">{s.name}</span>
+                             <div className="flex-1 h-2 bg-track rounded-full overflow-hidden">
+                               <div className="h-full rounded-full transition-all duration-500"
+                                 style={{ width: `${totalKcal > 0 ? Math.round((s.kcal / totalKcal) * 100) : 0}%`, background: s.color }} />
+                             </div>
+                             <span className="nums text-sm font-bold text-fg-soft w-12 text-right">{s.grams}g</span>
+                             <span className="nums text-xs text-fg-mute w-8 text-right">{totalKcal > 0 ? Math.round((s.kcal / totalKcal) * 100) : 0}%</span>
+                           </div>
+                         ))}
+                       </div>
                      </div>
-                   </div>
-                 ) : (
-                   <div className="flex flex-col items-center justify-center py-8 text-fg-mute">
-                     <IconBowl size={40} className="mb-2 opacity-60" />
-                     <p className="text-sm font-medium">Log food to see your macro breakdown</p>
-                   </div>
-                 )}
+                   ) : (
+                     <div className="flex flex-col items-center justify-center py-8 text-fg-mute">
+                       <IconBowl size={40} className="mb-2 opacity-60" />
+                       <p className="text-sm font-medium">Log food to see your macro breakdown</p>
+                     </div>
+                   )}
 
-                 {/* Reconcile the two figures rather than leaving the reader to
-                     notice they differ. Only when the gap is bigger than
-                     rounding — otherwise this is noise on every single day. */}
-                 {hasData && materialGap && (
-                   <p className="nums text-xs text-fg-mute mt-4 pt-3 border-t border-edge">
-                     {loggedKcal} kcal logged · {Math.abs(unaccounted)}{' '}
-                     {unaccounted > 0 ? 'not explained by these macros' : 'more than the logged total'}.{' '}
-                     <span className="text-fg-soft">
-                       Fibre, alcohol and rounding usually account for the difference.
-                     </span>
-                   </p>
-                 )}
-               </Card>
-             );
-           })()}
-
-           <section className="p-6 rounded-modal text-white shadow-lg" style={{background: 'linear-gradient(135deg, #16a34a, #15803d)'}}>
-             <div className="flex justify-between items-center mb-4">
-                <div><h3 className="text-xl font-bold">Micronutrient Score</h3></div>
-                <div className="nums text-5xl font-bold">{microScore}</div>
-             </div>
-             <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-6">
-                <div className="h-full bg-white/90 transition-all duration-1000" style={{ width: `${microScore}%` }} />
-             </div>
-
-             {nailedNutrients.length > 0 && (
-                <div className="bg-white/10 p-4 rounded-tile backdrop-blur-sm border border-white/20">
-                    <h4 className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-white/70 mb-2"><IconFlame size={14} /> You're nailing these:</h4>
-                    <div className="flex flex-wrap gap-2">
-                        {nailedNutrients.map(n => (
-                            <span key={n} className="bg-white/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-                                <IconCheck size={13} stroke={3} /> {n}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-             )}
-             {nailedNutrients.length === 0 && (
-                <div className="text-sm text-white/70 italic">
-                  Track more nutrient-dense whole foods to see your essential wins here!
-                </div>
-             )}
-           </section>
-
-           {/* Priority-nutrient bars. Lived in Trends in v1; it answers
-               "how am I doing today?", not "how has the week gone?" ── */}
-           <Card title="Micronutrient Snapshot">
-             <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
-             <div className="space-y-4">
-               {PRIORITY_MICROS.map((key) => {
-                 const info = NUTRIENT_INFO[key];
-                 if (!info?.targetVal) return null;
-                 const current = consumedMicros[key] || 0;
-                 const pct = Math.round((current / info.targetVal) * 100);
-                 const barPct = Math.min(pct, 100);
-                 const colorClass =
-                   pct >= 80 ? 'bg-nutri' : pct >= 40 ? 'bg-spark' : 'bg-fat';
-                 const displayAmount =
-                   current > 0 ? Math.round(current * 10) / 10 : 0;
-
-                 return (
-                   <div key={key}>
-                     <div className="flex justify-between items-baseline gap-3 mb-1.5">
-                       <span className="text-sm font-semibold text-fg">{key}</span>
-                       <span className="nums text-xs text-fg-soft shrink-0">
-                         {displayAmount}
-                         {info.unit}
-                         <span className="mx-1 text-fg-mute">·</span>
-                         <span className={`font-bold ${pct >= 80 ? 'text-nutri' : pct >= 40 ? 'text-spark' : 'text-fat'}`}>
-                           {pct}% DV
-                         </span>
+                   {/* Reconcile the two figures rather than leaving the reader to
+                       notice they differ. Only when the gap is bigger than
+                       rounding — otherwise this is noise on every single day. */}
+                   {hasData && materialGap && (
+                     <p className="nums text-xs text-fg-mute mt-4 pt-3 border-t border-edge">
+                       {loggedKcal} kcal logged · {Math.abs(unaccounted)}{' '}
+                       {unaccounted > 0 ? 'not explained by these macros' : 'more than the logged total'}.{' '}
+                       <span className="text-fg-soft">
+                         Fibre, alcohol and rounding usually account for the difference.
                        </span>
-                     </div>
-                     <div className="h-2.5 bg-track rounded-full overflow-hidden">
-                       <div
-                         className={`h-full transition-all duration-500 ${colorClass}`}
-                         style={{ width: `${barPct}%` }}
-                       />
-                     </div>
-                   </div>
-                 );
-               })}
+                     </p>
+                   )}
+                 </Card>
+               );
+             })()}
+
+             <Card title="Macro Targets">
+               <ProgressBar label="Protein" current={consumedMacros.protein} target={targets.protein} unit="g" colorClass="bg-protein" />
+               <ProgressBar label="Carbohydrates" current={consumedMacros.carbs} target={targets.carbs} unit="g" colorClass="bg-carbs" />
+               <ProgressBar label="Fats" current={consumedMacros.fat} target={targets.fat} unit="g" colorClass="bg-fat" />
+               <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
+             </Card>
              </div>
-           </Card>
+           </div>
 
-           <Card title="Macro Targets">
-             <ProgressBar label="Protein" current={consumedMacros.protein} target={targets.protein} unit="g" colorClass="bg-protein" />
-             <ProgressBar label="Carbohydrates" current={consumedMacros.carbs} target={targets.carbs} unit="g" colorClass="bg-carbs" />
-             <ProgressBar label="Fats" current={consumedMacros.fat} target={targets.fat} unit="g" colorClass="bg-fat" />
-             <ProgressBar label="Fiber" current={consumedMicros["Fiber"] || 0} target={NUTRIENT_INFO["Fiber"].targetVal || 28} unit="g" colorClass="bg-nutri" />
-           </Card>
-
-           <Card title="Micronutrient Breakdown" className="lg:col-span-2">
+           <Card title="Micronutrient Breakdown">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                  {/* Fiber is excluded because it has its own progress bar above,
                      with the macros where it belongs — not because it is
@@ -1052,7 +1074,7 @@ const isViewingToday = selectedDate === toISODateString();
            {/* Spans both columns: on a bad day this lists ten nutrients, and in
                a half-width column that was a 1600px ribbon with dead space
                beside it. Full width lets the gaps themselves sit two across. */}
-           <section className="rounded-card border border-edge shadow-e1 overflow-hidden lg:col-span-2">
+           <section className="rounded-card border border-edge shadow-e1 overflow-hidden">
               {nutrientGaps.length > 0 ? (
                 <>
                   <div className="bg-gradient-to-r from-spark to-fat px-6 py-4">
