@@ -1,5 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { originAllowed, clientKey, rateLimited } from './claude';
+// The .js extension is required, not cosmetic. package.json sets
+// "type": "module", so this runs under Node's ESM loader, which does NOT
+// resolve extensionless relative paths at runtime. Without it the function
+// deployed fine and then died on every invocation with
+// FUNCTION_INVOCATION_FAILED. api/claude.ts never hit this because its only
+// relative import is `import type`, which TypeScript erases.
+import { originAllowed, clientKey, rateLimited } from './claude.js';
 
 /**
  * Encrypted snapshot store.
