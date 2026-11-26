@@ -132,7 +132,7 @@ export const Coach: React.FC<CoachProps> = ({
           <h3 id="coach-title" className="inline-flex items-center gap-2 text-xl font-bold text-fg">
             <IconSparkles size={20} className="text-nutri" /> Coach
           </h3>
-          <p className="text-xs text-fg-mute mt-1">
+          <p className="text-sm text-fg-mute mt-1">
             {subject
               ? `Talking about your ${subject.label} support`
               : 'Ask about your logged nutrition'}

@@ -96,7 +96,7 @@ export const GoalPanel: React.FC = () => {
       {/* ── Editor ─────────────────────────────────────────────────────── */}
       {editing && (
         <div className="mt-4 space-y-4">
-          <p className="text-xs text-fg-mute">
+          <p className="text-sm text-fg-mute">
             You&apos;re currently <span className="nums font-semibold text-fg-soft">{formatWeight(currentKg, unit)}</span>.
           </p>
           <div className="grid grid-cols-2 gap-3">
@@ -164,7 +164,7 @@ export const GoalPanel: React.FC = () => {
           {/* Says what saving actually does. The daily target is the thing that
               changes, and it was previously not obvious it changed at all. */}
           {draft?.ok && (
-            <p className="text-xs text-fg-soft leading-relaxed border-l-2 border-accent/40 pl-3">
+            <p className="text-sm text-fg-soft leading-relaxed border-l-2 border-accent/40 pl-3">
               This sets your daily calorie target to{' '}
               <span className="nums font-bold text-fg">{draft.dailyCalories} kcal</span>{' '}
               from today onward — it replaces the{' '}
@@ -225,7 +225,7 @@ export const GoalPanel: React.FC = () => {
               {active.dailyCalories}
               <span className="text-sm font-normal text-fg-soft ml-1">kcal</span>
             </div>
-            <p className="text-xs text-fg-soft mt-1">
+            <p className="text-sm text-fg-soft mt-1">
               {active.dailyAdjustment === 0
                 ? 'Maintenance'
                 : `${Math.abs(active.dailyAdjustment)} kcal ${active.dailyAdjustment < 0 ? 'below' : 'above'} maintenance`}

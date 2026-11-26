@@ -56,7 +56,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose
               {recipe.servings && <span>Servings: {recipe.servings}</span>}
             </div>
             <div>
-              <h4 className="font-bold text-fg mb-2">Ingredients</h4>
+              <h4 className="font-display font-bold text-fg mb-2">Ingredients</h4>
               <ul className="space-y-1 text-sm text-fg-soft">
                 {recipe.ingredients.map((ing, i) => (
                   <li key={i}>• {ing.amount} {ing.item}</li>
@@ -64,7 +64,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ meal, profile, onClose
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-fg mb-2">Steps</h4>
+              <h4 className="font-display font-bold text-fg mb-2">Steps</h4>
               <ol className="list-decimal list-inside space-y-2 text-sm text-fg-soft">
                 {recipe.steps.map((step, i) => (
                   <li key={i}>{step}</li>

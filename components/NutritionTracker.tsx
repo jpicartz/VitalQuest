@@ -478,7 +478,7 @@ const isViewingToday = selectedDate === toISODateString();
                     </button>
                     <div className="text-center">
                       <p className="font-semibold text-fg text-sm">{title}</p>
-                      <p className="text-xs text-fg-mute">{subtitle}</p>
+                      <p className="text-sm text-fg-mute">{subtitle}</p>
                     </div>
                     <button
                       onClick={() => {
@@ -613,7 +613,7 @@ const isViewingToday = selectedDate === toISODateString();
                   return (
                     <div key={type} className="bg-card rounded-card border border-edge shadow-e1 overflow-hidden">
                       <div className="bg-raised p-4 flex justify-between items-center border-b border-edge">
-                        <h4 className="font-bold text-fg">{type}</h4>
+                        <h4 className="font-display font-bold text-fg">{type}</h4>
                         <span className="nums text-sm text-fg-soft">{Math.round(mealLogs.reduce((acc, l) => acc + (Number(l.food.calories) || 0), 0))} kcal</span>
                       </div>
                       <div className="divide-y divide-edge">
@@ -657,7 +657,7 @@ const isViewingToday = selectedDate === toISODateString();
           ) : (
             <div className="bg-card rounded-modal shadow-lg dark:shadow-none border border-edge p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-fg">Add to {selectedMeal}</h3>
+                <h3 className="font-display text-xl font-bold text-fg leading-tight tracking-[-0.01em]">Add to {selectedMeal}</h3>
                 <button onClick={() => setIsAdding(false)} className="text-fg-soft hover:text-fg text-sm font-medium">Cancel</button>
               </div>
               <div className="mb-8">
@@ -876,7 +876,7 @@ const isViewingToday = selectedDate === toISODateString();
              <div className="space-y-8">
              <section className="p-6 rounded-modal text-white shadow-lg" style={{background: 'linear-gradient(135deg, #16a34a, #15803d)'}}>
                <div className="flex justify-between items-center mb-4">
-                  <div><h3 className="text-xl font-bold">Micronutrient Score</h3></div>
+                  <div><h3 className="font-display text-xl font-bold leading-tight">Micronutrient Score</h3></div>
                   <div className="nums text-5xl font-bold">{microScore}</div>
                </div>
                <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-6">
@@ -905,7 +905,7 @@ const isViewingToday = selectedDate === toISODateString();
              {/* Priority-nutrient bars. Lived in Trends in v1; it answers
                  "how am I doing today?", not "how has the week gone?" ── */}
              <Card title="Micronutrient Snapshot">
-               <p className="text-xs text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
+               <p className="text-sm text-fg-mute mb-6">Today&apos;s progress toward priority nutrient targets</p>
                <div className="space-y-4">
                  {PRIORITY_MICROS.map((key) => {
                    const info = NUTRIENT_INFO[key];
@@ -1129,7 +1129,7 @@ const isViewingToday = selectedDate === toISODateString();
               {nutrientGaps.length > 0 ? (
                 <>
                   <div className="bg-gradient-to-r from-spark to-fat px-6 py-4">
-                    <h3 className="text-lg font-bold text-white">What You&apos;re Missing Today</h3>
+                    <h3 className="font-display text-lg font-bold text-white leading-tight">What You&apos;re Missing Today</h3>
                     <p className="text-sm text-white/85 mt-1">
                       Priority nutrients below 50% of your daily target
                     </p>
@@ -1141,7 +1141,7 @@ const isViewingToday = selectedDate === toISODateString();
                         className="bg-card p-4 rounded-tile border border-edge shadow-e1"
                       >
                         <div className="flex justify-between items-start gap-3 mb-3">
-                          <h4 className="font-bold text-fg">{key}</h4>
+                          <h4 className="font-display font-bold text-fg">{key}</h4>
                           <span className="nums text-sm font-black text-fat bg-fat/10 px-2.5 py-1 rounded-control border border-fat/20 shrink-0">
                             {displayPct} DV
                           </span>
@@ -1168,7 +1168,7 @@ const isViewingToday = selectedDate === toISODateString();
                   <div className="flex items-start gap-4">
                     <span className="w-9 h-9 rounded-full bg-nutri/15 text-nutri flex items-center justify-center shrink-0"><IconCheck size={20} stroke={2.5} /></span>
                     <div>
-                      <h3 className="text-lg font-bold text-fg">All priority nutrients on track</h3>
+                      <h3 className="font-display text-lg font-bold text-fg leading-tight">All priority nutrients on track</h3>
                       <p className="text-sm text-fg-soft mt-1">
                         Every priority micronutrient is at least 50% of your daily target today. Keep it up!
                       </p>
@@ -1240,7 +1240,7 @@ const isViewingToday = selectedDate === toISODateString();
                         {isCeiling ? 'Common Sources' : 'Suggested Food Sources'}
                       </h4>
                       {isCeiling && (
-                        <p className="text-xs text-fg-soft mb-3">
+                        <p className="text-sm text-fg-soft mb-3">
                           Where this usually comes from — worth watching rather than seeking out.
                         </p>
                       )}

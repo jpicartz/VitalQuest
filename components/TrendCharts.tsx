@@ -115,7 +115,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({
       </Card>
 
       <Card title="Macro Breakdown">
-        <p className="text-xs text-fg-mute mb-4">{rangeLabel} calories from protein, carbs, and fat</p>
+        <p className="text-sm text-fg-mute mb-4">{rangeLabel} calories from protein, carbs, and fat</p>
         {macroPieData.length > 0 ? (
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="w-[260px] shrink-0">

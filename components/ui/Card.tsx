@@ -48,8 +48,18 @@ export const Card: React.FC<CardProps> = ({
     {(title || action) && (
       <div className="flex items-start justify-between gap-3 mb-5">
         <div className="min-w-0">
-          {title && <h3 className="font-display text-lg font-bold text-fg">{title}</h3>}
-          {description && <p className="text-xs text-fg-mute mt-1 max-w-prose">{description}</p>}
+          {/* Every section heading in the app comes through here, so the type
+              scale is set once rather than per card. The old pair — lg title
+              over xs description — sat barely above body text, which is why
+              the interface read as one undifferentiated size. */}
+          {title && (
+            <h3 className="font-display text-xl font-bold text-fg leading-tight tracking-[-0.01em]">
+              {title}
+            </h3>
+          )}
+          {description && (
+            <p className="text-sm text-fg-soft mt-1.5 leading-snug max-w-prose">{description}</p>
+          )}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>

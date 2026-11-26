@@ -137,7 +137,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
             <label htmlFor="recipe-ingredients" className="block text-xs font-semibold uppercase tracking-wider text-fg-soft mb-1.5">
               Everything that went into the batch
             </label>
-            <p className="text-xs text-fg-mute mb-1.5">
+            <p className="text-sm text-fg-mute mb-1.5">
               One ingredient per line, with amounts. Include the whole batch — not one serving.
             </p>
             <textarea

@@ -56,7 +56,7 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
         <Card>
           <div className="flex items-center gap-2 mb-4">
              <IconSparkles size={22} className="text-nutri" />
-             <h3 className="font-bold text-fg text-lg">What You're Doing Well</h3>
+             <h3 className="font-display font-bold text-fg text-lg leading-tight">What You're Doing Well</h3>
           </div>
           <ul className="space-y-3">
             {plan.currentStrengths?.map((item, i) => (
@@ -71,7 +71,7 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
         <Card>
           <div className="flex items-center gap-2 mb-4">
              <IconRocket size={22} className="text-spark" />
-             <h3 className="font-bold text-fg text-lg">Areas for Improvement</h3>
+             <h3 className="font-display font-bold text-fg text-lg leading-tight">Areas for Improvement</h3>
           </div>
           <ul className="space-y-3">
             {plan.areasForImprovement?.map((item, i) => (
@@ -89,7 +89,7 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
         <section className="bg-raised rounded-card p-6 border border-edge">
           <div className="flex items-center gap-3 mb-4">
              <div className="w-10 h-10 bg-nutri/15 text-nutri rounded-full flex items-center justify-center"><IconSalad size={20} /></div>
-             <h3 className="text-xl font-bold text-fg">Nutrition Strategy</h3>
+             <h3 className="font-display text-xl font-bold text-fg leading-tight tracking-[-0.01em]">Nutrition Strategy</h3>
           </div>
           <p className="text-fg-soft mb-6 font-medium">{plan.nutritionFocus}</p>
 
@@ -109,9 +109,9 @@ export const PlanDisplay: React.FC<{ plan: WellnessPlan }> = ({ plan }) => {
         <section className="bg-raised rounded-card p-6 border border-edge">
            <div className="flex items-center gap-3 mb-4">
              <div className="w-10 h-10 bg-hydro/15 text-hydro rounded-full flex items-center justify-center"><IconPill size={20} /></div>
-             <h3 className="text-xl font-bold text-fg">Safe Supplementation</h3>
+             <h3 className="font-display text-xl font-bold text-fg leading-tight tracking-[-0.01em]">Safe Supplementation</h3>
           </div>
-          <p className="text-xs text-fg-mute mb-4">
+          <p className="text-sm text-fg-mute mb-4">
             Supplements are secondary to food. Only considered if evidence-based and safe for you.
           </p>
           {(plan.safeSupplements?.length ?? 0) === 0 ? (

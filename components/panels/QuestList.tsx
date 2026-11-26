@@ -21,7 +21,7 @@ export const QuestList: React.FC<QuestListProps> = ({
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex justify-between items-end mb-2">
-        <h3 className="text-xl font-bold text-fg">Today's Goals</h3>
+        <h3 className="font-display text-xl font-bold text-fg leading-tight tracking-[-0.01em]">Today's Goals</h3>
         <span className="nums text-sm font-semibold text-nutri">{calculateProgress()}% complete</span>
       </div>
       <div className="h-3 bg-track rounded-full overflow-hidden mb-6">

@@ -147,7 +147,7 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
               {BAND_COPY[supportBand(weakest.score)]} support
             </div>
             {weakestGaps.length > 0 && (
-              <p className="text-xs text-fg-soft leading-snug mt-2">
+              <p className="text-sm text-fg-soft leading-snug mt-2">
                 Short on {listPhrase(weakestGaps.slice(0, 2).map((g) => g.nutrient))}
               </p>
             )}
@@ -239,7 +239,7 @@ export const BodySystems: React.FC<BodySystemsProps> = ({ consumedMicros, consum
               <div className={`text-sm font-bold ${bandColor(open.score)}`}>
                 {BAND_COPY[supportBand(open.score)]} support today
               </div>
-              <p className="text-xs text-fg-mute mt-0.5">
+              <p className="text-sm text-fg-mute mt-0.5">
                 Average across {open.contributions.length} nutrients
               </p>
             </div>

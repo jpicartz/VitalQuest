@@ -108,7 +108,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="nums text-2xl font-bold text-fg leading-none">
               {gamification.xp} <span className="text-base font-semibold text-fg-soft">XP</span>
             </div>
-            <p className="text-xs text-fg-soft mt-1.5">{100 - (gamification.xp % 100)} to level {gamification.level + 1}</p>
+            <p className="text-sm text-fg-soft mt-1.5">{100 - (gamification.xp % 100)} to level {gamification.level + 1}</p>
           </div>
         </div>
         <div className="flex gap-3 w-full sm:w-auto sm:ml-auto">

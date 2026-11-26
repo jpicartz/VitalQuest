@@ -38,7 +38,7 @@ export const ExercisePanel: React.FC = () => {
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-fg">Exercise</h3>
+                  <h3 className="font-display text-lg font-bold text-fg leading-tight">Exercise</h3>
                   {todayXp > 0 && <p className="nums text-xs text-nutri font-semibold">+{todayXp} XP earned today</p>}
                 </div>
                 <button

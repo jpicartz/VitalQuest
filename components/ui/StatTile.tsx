@@ -39,11 +39,11 @@ export const StatTile: React.FC<StatTileProps> = ({
         {icon}
         {label}
       </p>
-      <p className={`nums text-2xl font-bold leading-none ${t.value}`}>
+      <p className={`nums text-3xl font-bold leading-none tracking-[-0.02em] ${t.value}`}>
         {value}
-        {unit && <span className="text-sm font-normal opacity-70 ml-1">{unit}</span>}
+        {unit && <span className="text-sm font-normal opacity-60 ml-1">{unit}</span>}
       </p>
-      {caption && <div className="text-xs mt-1.5">{caption}</div>}
+      {caption && <div className="text-xs mt-2 opacity-80">{caption}</div>}
     </div>
   );
 };
