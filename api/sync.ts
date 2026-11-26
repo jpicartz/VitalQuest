@@ -27,9 +27,17 @@ const TTL_SECONDS = 90 * 24 * 60 * 60;
 /** A syncId is a SHA-256 digest in hex, and nothing else is accepted as one. */
 const SYNC_ID = /^[0-9a-f]{64}$/;
 
+/**
+ * Find the Redis credentials, whatever the integration decided to call them.
+ *
+ * Vercel's Upstash integration sets KV_REST_API_* in some flows and
+ * UPSTASH_REDIS_REST_* in others, depending on when and how the store was
+ * connected. Reading only one pair means a correctly provisioned database
+ * still answers 503, with nothing to explain why — so read both.
+ */
 const store = () => {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
   return { url: url.replace(/\/$/, ''), token };
 };

@@ -49,6 +49,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
 });
 
 describe('a blob belongs to exactly one sync id', () => {
@@ -128,8 +130,20 @@ describe('origin and method', () => {
 });
 
 describe('failure modes are honest', () => {
+  it('accepts the Upstash variable names too', async () => {
+    // The integration sets one pair or the other depending on how the store
+    // was connected. Reading only KV_* meant a working database still 503'd.
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+    process.env.UPSTASH_REDIS_REST_URL = 'https://store.test';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
+    const { status } = await call({ method: 'GET', query: { id: ID_B } });
+    expect(status).toBe(404);   // reached the store and found nothing, not 503
+  });
+
   it('says so plainly when the store is not configured', async () => {
     delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
     const { status, body } = await call({ method: 'GET', query: { id: ID_A } });
     expect(status).toBe(503);
     expect(body.error).toMatch(/not configured/i);
