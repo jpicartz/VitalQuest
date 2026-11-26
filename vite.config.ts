@@ -3,7 +3,14 @@ import path from 'path';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
+// A short, human-readable stamp for the running build. Shown in the profile
+// sheet so "is this device actually up to date?" stops being guesswork.
+const BUILD_ID = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
 export default defineConfig({
+  define: {
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
+  },
   server: {
     port: 3000,
     host: '0.0.0.0',

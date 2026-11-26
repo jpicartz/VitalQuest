@@ -6,6 +6,7 @@ import {
   pairingUrl, lastSyncedAt,
 } from '../../services/syncService';
 import { formatCode } from '../../utils/syncCrypto';
+import { BUILD_ID } from '../../utils/buildVersion';
 import { IconDeviceMobile, IconRefresh, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 
 interface SyncPanelProps {
@@ -172,6 +173,11 @@ export const SyncPanel: React.FC<SyncPanelProps> = ({ onSync }) => {
           <IconCheck size={15} stroke={2.5} className="mt-0.5 shrink-0" /> {result}
         </p>
       )}
+      {/* Both devices must be on the same build for a sync to behave. When one
+          is not, the symptom is "I synced and nothing happened" — with nothing
+          on screen to explain it. */}
+      <p className="nums text-[10px] text-fg-mute mt-4">Build {BUILD_ID}</p>
+
       {error && (
         <p role="alert" className="mt-3 inline-flex items-start gap-1.5 text-sm text-fat">
           <IconAlertTriangle size={15} className="mt-0.5 shrink-0" /> {error}

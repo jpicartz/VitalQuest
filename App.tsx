@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { readItem, writeItem, removeItem, StorageFailure } from './utils/safeStorage';
 import { Onboarding } from './components/Onboarding';
 import { RestoreFromSync } from './components/RestoreFromSync';
+import { UpdateBanner } from './components/UpdateBanner';
 import { Dashboard } from './components/Dashboard';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { LogsProvider } from './contexts/LogsContext';
@@ -449,6 +450,8 @@ const App: React.FC = () => {
           </div>
         </div>
       </nav>
+      <UpdateBanner />
+
       {storageFailure && (
         <div role="alert" className="bg-fat/10 border-b border-fat/30 px-4 py-3">
           <div className="max-w-4xl mx-auto flex items-start gap-3">
