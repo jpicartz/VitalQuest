@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { readItem, writeItem, removeItem, StorageFailure } from './utils/safeStorage';
 import { Onboarding } from './components/Onboarding';
+import { RestoreFromSync } from './components/RestoreFromSync';
 import { Dashboard } from './components/Dashboard';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { LogsProvider } from './contexts/LogsContext';
@@ -439,6 +440,11 @@ const App: React.FC = () => {
         {view === 'onboarding' ? (
           <div className="py-12 px-4">
             <Onboarding onComplete={handleOnboardingComplete} isLoading={isLoading} />
+            {/* The only route back in on a device with nothing stored. iOS
+                gives a home-screen web app its own storage container, so
+                installing the app lands here with the data sitting in Safari
+                and no way to ask for it. */}
+            <RestoreFromSync onRestore={handleSync} />
           </div>
         ) : (
           profile && metrics && plan && (
