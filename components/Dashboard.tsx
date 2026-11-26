@@ -13,6 +13,7 @@ import { ExercisePanel } from './panels/ExercisePanel';
 import { AchievementsPanel } from './panels/AchievementsPanel';
 import { StatsPanel } from './panels/StatsPanel';
 import { UnitPreference } from './panels/UnitPreference';
+import { SyncPanel } from './panels/SyncPanel';
 import { CoachTabPanel } from './panels/CoachTabPanel';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { useProfile } from '../contexts/ProfileContext';
@@ -30,6 +31,8 @@ interface DashboardProps {
   gamification: GamificationState;
   onUpdateGamification: (newState: GamificationState, questsCompletedDelta?: number) => void;
   onReset: () => void;
+  /** One pull-merge-push cycle; resolves with what arrived from the other device. */
+  onSync: (code: string) => Promise<{ added: number }>;
 }
 
 export type TabId = 'today' | 'body' | 'goal' | 'coach';
@@ -46,6 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   gamification,
   onUpdateGamification,
   onReset,
+  onSync,
 }) => {
   const { plan } = useProfile();
   // The header's denominator is a target, so it follows the same source as
@@ -95,7 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 pb-20">
+    <div className="max-w-7xl mx-auto p-4 md:p-6 pb-28 lg:pb-20">
       {/* Header */}
       <header className="relative flex flex-col sm:flex-row items-center gap-5 bg-card rounded-card border border-edge shadow-e1 p-5 mb-5 animate-fade-in">
         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -155,13 +159,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Four destinations, one job each. See docs/v2-surface-inventory.md. */}
+      {/* Four destinations, one job each. See docs/v2-surface-inventory.md.
+          Below `lg` this is pinned to the bottom of the viewport: on a phone
+          the top of the screen is the hardest place to reach one-handed, and
+          this app's whole point on mobile is logging something in ten seconds.
+          It is still the same tablist with the same roles, so every test that
+          finds a tab by role keeps passing — only the position changed. */}
       <SegmentedControl<TabId>
         role="tablist"
         label="Main navigation"
         value={activeTab}
         onChange={setActiveTab}
-        className="grid grid-cols-4 gap-1 mb-6 bg-raised p-1 rounded-control w-full sm:w-fit mx-auto md:mx-0"
+        className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-edge
+                   lg:static lg:z-auto lg:mb-6 lg:bg-raised lg:p-1 lg:pb-1 lg:rounded-control lg:border-0 lg:w-fit lg:backdrop-blur-none"
         segmentClassName="relative flex flex-col sm:inline-flex sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-4 py-2 rounded-[8px] font-semibold text-[11px] sm:text-sm whitespace-nowrap"
         segments={TABS.map(({ id, label, Icon }) => {
           const remaining = AVATAR_ACHIEVEMENTS.length - gamification.completedQuestIds.length;
@@ -247,6 +257,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <AchievementsPanel gamification={gamification} />
             <StatsPanel gamification={gamification} />
             <UnitPreference />
+            <SyncPanel onSync={onSync} />
 
             <div className="pt-2 text-center">
               <Button

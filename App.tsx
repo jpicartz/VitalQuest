@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { readItem, writeItem, removeItem, StorageFailure } from './utils/safeStorage';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
@@ -11,6 +11,8 @@ import {
 import { generateWellnessPlan } from './services/claudeService';
 import { toISODateString, isSameISODate, timestampForISODate } from './utils/dateUtils';
 import { updateStreak, resetQuestsIfNewDay } from './utils/streakUtils';
+import { syncNow, savedCode, saveCode, takeCodeFromUrl } from './services/syncService';
+import type { SyncData } from './utils/syncMerge';
 import { checkBadges } from './utils/badgeUtils';
 import { computeMicroScore } from './utils/nutritionAggregates';
 import { calculateMetrics } from './utils/metricsUtils';
@@ -47,6 +49,11 @@ const App: React.FC = () => {
 
   // Null while saving works. Set when a write fails so the UI can say so.
   const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(null);
+
+  // Gates the opening sync. Syncing before localStorage has loaded would merge
+  // the remote snapshot against EMPTY local state and push that back, quietly
+  // deleting everything logged on the other device.
+  const [hydrated, setHydrated] = useState(false);
 
   // ── Theme (dual-mode) — isolated from vitalQuestData, own localStorage key ──
   const [theme, setTheme] = useState<Theme>(() => {
@@ -108,20 +115,74 @@ const App: React.FC = () => {
         console.error('Failed to parse saved data', e);
       }
     }
+    // A pairing link puts the code in the URL fragment. Taking it here also
+    // strips it from the address bar, so it does not linger in history.
+    const fromUrl = takeCodeFromUrl();
+    if (fromUrl) saveCode(fromUrl);
+    setHydrated(true);
   }, []);
+
+  // Everything this device holds, in one place.
+  //
+  // The localStorage write and the sync blob MUST describe the same thing. When
+  // they were two separate object literals, adding a slice to one and not the
+  // other would have synced a silently incomplete snapshot — the exact drift
+  // that decisions.md §13 is about for aggregation.
+  const snapshot = useCallback((): SyncData => ({
+    profile, metrics, plan, gamification, foodLogs,
+    waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes,
+    weightGoal,
+  }), [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory,
+       favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes, weightGoal]);
 
   // ── Persist to localStorage ───────────────────────────────────────────────
   useEffect(() => {
     if (profile && metrics && plan) {
       // A failed write means nothing the user does is being saved. Surface it
       // rather than letting the app look like it is working.
-      setStorageFailure(writeItem('vitalQuestData', JSON.stringify({
-        profile, metrics, plan, gamification, foodLogs,
-        waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes,
-        weightGoal,
-      })));
+      setStorageFailure(writeItem('vitalQuestData', JSON.stringify(snapshot())));
     }
-  }, [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, weightGoal, recipes]);
+  }, [profile, metrics, plan, snapshot]);
+
+  /** Apply a merged snapshot back into state. Used after every sync. */
+  const applySnapshot = useCallback((data: SyncData) => {
+    if (data.profile) setProfile(data.profile as UserProfile);
+    if (data.metrics) setMetrics(data.metrics as CalculatedMetrics);
+    if (data.plan) setPlan(data.plan as WellnessPlan);
+    if (data.gamification) setGamification(data.gamification as GamificationState);
+    setFoodLogs((data.foodLogs ?? []) as MealLog[]);
+    setWeightHistory((data.weightHistory ?? []) as WeightEntry[]);
+    setFavouriteFoods((data.favouriteFoods ?? []) as FoodItem[]);
+    setRecipes((data.recipes ?? []) as SavedRecipe[]);
+    setExerciseLogs((data.exerciseLogs ?? []) as ExerciseEntry[]);
+    setLifetimeQuestsCompleted(Number(data.lifetimeQuestsCompleted) || 0);
+    setWeightGoal((data.weightGoal ?? null) as StoredWeightGoal | null);
+    // Water is per-day: only adopt the remote row if it describes TODAY, or a
+    // stale row from another device would wipe today's intake.
+    const incomingWater = data.waterLog as WaterLog | undefined;
+    if (incomingWater?.date === toISODateString()) setWaterLog(incomingWater);
+  }, []);
+
+  /** One sync cycle. Returns how many entries arrived, for the panel to report. */
+  const handleSync = useCallback(async (code: string) => {
+    const outcome = await syncNow(code, snapshot());
+    applySnapshot(outcome.data);
+    return { added: outcome.summary.added };
+  }, [snapshot, applySnapshot]);
+
+  // ── Pull once on open ─────────────────────────────────────────────────────
+  // Only on open and on demand. Syncing on every change would spend requests on
+  // every water tap and race two devices against each other for no benefit.
+  const openingSyncDone = useRef(false);
+  useEffect(() => {
+    if (!hydrated || openingSyncDone.current) return;
+    const code = savedCode();
+    if (!code) return;
+    openingSyncDone.current = true;
+    // Deliberately not awaited and never fatal: a failed sync must not stop the
+    // app loading, and the panel surfaces the error when the user asks for one.
+    handleSync(code).catch((e) => console.error('opening sync failed:', e));
+  }, [hydrated, handleSync]);
 
   // ── Badge checker — runs whenever gamification changes ────────────────────
   const runBadgeCheck = useCallback((
@@ -406,6 +467,7 @@ const App: React.FC = () => {
                   gamification={gamification}
                   onUpdateGamification={handleUpdateGamification}
                   onReset={handleReset}
+                  onSync={handleSync}
                 />
               </LogsProvider>
             </ProfileProvider>

@@ -133,6 +133,10 @@ around. For a single-user health tracker the trade is strongly favourable.
 devices, no sharing with a clinician, no recovery if the browser store is
 cleared. That was accepted knowingly, not overlooked.
 
+**Amended (see §14).** Cross-device sync was the cap that actually bit: the app
+was unusable away from one laptop, which is where food is eaten. §7 now reads
+"no account, nothing readable stored" rather than "no backend at all".
+
 **What it cost:** writes were unguarded for a long time, and `setItem` throws
 outright in Safari private browsing — so the app crashed on first render there,
 in production, until an audit caught it. When persistence *is* the architecture,
@@ -269,3 +273,41 @@ applied to one copy and missed in the other — the NaN guard, and the
 equal, and the failure is silent: two surfaces disagree and neither is obviously
 wrong. Making the function exported and shared is cheaper than a test asserting
 the two copies match.
+
+---
+
+## 14. Sync stores ciphertext, so §7's promise survives the backend
+
+**Decision.** Devices share data through a server that holds AES-GCM ciphertext
+under a random 256-bit key name. A generated 128-bit code derives two values via
+HKDF with different `info` labels: one is the storage id and goes to the server,
+the other is the encryption key and never leaves the device.
+
+**Why.** §7 bought real things — nothing to breach, no data-retention policy, no
+account to create — and those came from "nothing readable is stored", not from
+"nothing is stored". Encrypting on the client keeps every one of them while
+removing the limitation that actually hurt. The README and the LinkedIn post
+stay true as written.
+
+**The code is generated, never chosen.** A user-picked passphrase would be
+brute-forceable offline by anyone who copied the blob. 128 random bits are not.
+This removes the weak link instead of warning about it.
+
+**Pairing is a QR, not typing.** The code rides in the URL fragment, which
+browsers never send to a server, so the key does not transit even during setup.
+
+**What it costs, stated plainly:**
+
+- **Lose the code, lose the sync.** There is no recovery, by construction —
+  anyone who could reset it for you could also read your data.
+- **Same-day water can lose an edit.** Logs merge by id and survive from both
+  devices; single-valued state takes the newer device's copy. Water is one row
+  per day, so two devices editing it in one session keep only one. Fixing that
+  needs per-field timestamps the schema does not have.
+- **Progression merges upward.** XP, level, streak and badges take the maximum
+  or the union, never the newer value, so syncing can only ever add to what was
+  earned.
+
+**Reverse this if** sharing with a clinician becomes the point. That needs
+server-readable data and therefore real accounts, and it is a different product
+with a different privacy story — not an extension of this one.

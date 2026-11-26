@@ -50,6 +50,21 @@ const MEAL_TYPES: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
 const rangeOptions = [7, 14, 30];
 
+/**
+ * The meal it probably is right now.
+ *
+ * The floating log button skips the meal picker, so it has to guess — and
+ * guessing by clock beats defaulting to Breakfast at 8pm. The user can still
+ * change it in the form.
+ */
+const mealTypeForNow = (): MealType => {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Breakfast';
+  if (hour < 16) return 'Lunch';
+  if (hour < 21) return 'Dinner';
+  return 'Snack';
+};
+
 export const NutritionTracker: React.FC<NutritionTrackerProps> = ({ view }) => {
   const { profile, plan } = useProfile();
   const weightUnit: WeightUnit = profile.weightUnit ?? 'kg';
@@ -699,6 +714,25 @@ const isViewingToday = selectedDate === toISODateString();
                 Reset Today&apos;s Log
               </Button>
             </div>
+          )}
+
+          {/* Thumb-reach logging, phones only.
+              On a laptop "Add Food" sits inside each meal card and that is
+              fine. On a phone those buttons are a scroll away from wherever you
+              are, and the entire reason to open this on a phone is to log
+              something in ten seconds. Hidden once the add form is already
+              open, and hidden on past days, which are read-only by design. */}
+          {!isAdding && isViewingToday && (
+            <button
+              onClick={() => { setSelectedMeal(mealTypeForNow()); setIsAdding(true); }}
+              aria-label="Log food"
+              className="lg:hidden fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30
+                         w-14 h-14 rounded-full bg-nutri-strong text-white shadow-e3
+                         flex items-center justify-center active:scale-95 transition-transform
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nutri focus-visible:ring-offset-2"
+            >
+              <IconPlus size={26} stroke={2.5} />
+            </button>
           )}
         </div>
       )}

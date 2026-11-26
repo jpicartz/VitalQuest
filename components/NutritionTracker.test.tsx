@@ -288,3 +288,33 @@ describe('a ceiling is never celebrated', () => {
     expect(within(nailed).queryByText('Sugar')).not.toBeInTheDocument();
   });
 });
+
+describe('thumb-reach logging', () => {
+  const logButton = () => screen.queryByRole('button', { name: /^log food$/i });
+
+  it('offers a floating log button on today', () => {
+    renderWithApp(<NutritionTracker view="log" />, {});
+    expect(logButton()).toBeInTheDocument();
+  });
+
+  it('opens the add-food form in one tap', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<NutritionTracker view="log" />, {});
+    await user.click(logButton()!);
+    // It picks the meal by clock rather than asking, so one tap reaches input.
+    expect(screen.getByText(/^Add to (Breakfast|Lunch|Dinner|Snack)$/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/2 eggs and a banana/i)).toBeInTheDocument();
+  });
+
+  it('hides itself once the form is open', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<NutritionTracker view="log" />, {});
+    await user.click(logButton()!);
+    expect(logButton()).not.toBeInTheDocument();
+  });
+
+  it('is absent on a past day, which is read-only', () => {
+    renderWithApp(<NutritionTracker view="log" />, { selectedDate: addDaysISO(TODAY, -3) });
+    expect(logButton()).not.toBeInTheDocument();
+  });
+});

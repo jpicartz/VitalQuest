@@ -2,14 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>VitalQuest - Level Up Your Health</title>
-    <meta name="description" content="An evidence-based, gamified wellness tracker. Log food in plain English, see where your micronutrients actually land, and keep your streak alive with daily quests." />
+    <meta name="description" content="An evidence-based wellness tracker. Log food in plain English, see where your micronutrients actually land, and watch your character respond to how you ate." />
     <meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)" />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/og-image.png" />
+    <!-- og-image.png is a 1200x630 social card; it was pointed at here too,
+         which rendered a squashed banner as the home-screen icon. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Added to Home Screen on iOS: open standalone, no browser chrome. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VitalQuest" />
+    <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- Social preview (LinkedIn, X, Slack, iMessage) -->
     <meta property="og:type" content="website" />

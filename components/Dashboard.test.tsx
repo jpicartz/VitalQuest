@@ -25,10 +25,11 @@ type Over = AppOverrides & {
   gamification?: Parameters<typeof Dashboard>[0]['gamification'];
   onUpdateGamification?: Parameters<typeof Dashboard>[0]['onUpdateGamification'];
   onReset?: Parameters<typeof Dashboard>[0]['onReset'];
+  onSync?: Parameters<typeof Dashboard>[0]['onSync'];
 };
 
 const renderDashboard = (over: Over = {}) => {
-  const { gamification, onUpdateGamification, onReset, ...ctx } = over;
+  const { gamification, onUpdateGamification, onReset, onSync, ...ctx } = over;
   return {
     user: userEvent.setup(),
     ...renderWithApp(
@@ -36,6 +37,7 @@ const renderDashboard = (over: Over = {}) => {
         gamification={gamification ?? aGamification()}
         onUpdateGamification={onUpdateGamification ?? vi.fn()}
         onReset={onReset ?? vi.fn()}
+        onSync={onSync ?? vi.fn().mockResolvedValue({ added: 0 })}
       />,
       { weightHistory: [aWeightEntry({ kg: 76, isBaseline: true })], ...ctx },
     ),
