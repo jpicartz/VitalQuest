@@ -146,6 +146,17 @@ const App: React.FC = () => {
 
   /** Apply a merged snapshot back into state. Used after every sync. */
   const applySnapshot = useCallback((data: SyncData) => {
+    // A first sync onto a NEW device is the whole point of the feature, and
+    // that device is sitting on the onboarding form. Restoring the profile
+    // without leaving that form meant the data arrived, was saved, and the
+    // user was still asked to type it all in again — and completing the form
+    // would then have overwritten what had just synced.
+    //
+    // Same completeness check the localStorage hydrate uses: a partial
+    // snapshot must not skip onboarding, or the app reaches the dashboard
+    // without the plan and targets every tab reads.
+    if (data.profile && data.metrics && data.plan) setView('dashboard');
+
     if (data.profile) setProfile(data.profile as UserProfile);
     if (data.metrics) setMetrics(data.metrics as CalculatedMetrics);
     if (data.plan) setPlan(data.plan as WellnessPlan);
