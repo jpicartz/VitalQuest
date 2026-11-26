@@ -48,6 +48,10 @@ const App: React.FC = () => {
   const [weightGoal, setWeightGoal] = useState<StoredWeightGoal | null>(null);
   const [exerciseLogs, setExerciseLogs] = useState<ExerciseEntry[]>([]);
 
+  // Ids this device has deleted, and when. Carried in the sync blob so the
+  // other device learns about the deletion instead of restoring the entry.
+  const [deletedIds, setDeletedIds] = useState<Record<string, number>>({});
+
   // Null while saving works. Set when a write fails so the UI can say so.
   const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(null);
 
@@ -110,6 +114,7 @@ const App: React.FC = () => {
           setFavouriteFoods(parsed.favouriteFoods || []);
           setRecipes(parsed.recipes || []);
           setExerciseLogs(parsed.exerciseLogs || []);
+          setDeletedIds(parsed.deletedIds || {});
           setView('dashboard');
         }
       } catch (e) {
@@ -132,9 +137,25 @@ const App: React.FC = () => {
   const snapshot = useCallback((): SyncData => ({
     profile, metrics, plan, gamification, foodLogs,
     waterLog, weightHistory, favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes,
-    weightGoal,
+    weightGoal, deletedIds,
   }), [profile, metrics, plan, gamification, foodLogs, waterLog, weightHistory,
-       favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes, weightGoal]);
+       favouriteFoods, lifetimeQuestsCompleted, exerciseLogs, recipes, weightGoal, deletedIds]);
+
+  /**
+   * Remember that something was deleted.
+   *
+   * A plain filter is not enough once two devices are involved: the other one
+   * still holds the entry, so the merge restores it and pushes it back, and
+   * the deletion is undone everywhere. Every delete handler records here.
+   */
+  const recordDeletion = useCallback((...ids: string[]) => {
+    const at = Date.now();
+    setDeletedIds(prev => {
+      const next = { ...prev };
+      for (const id of ids) if (id) next[id] = at;
+      return next;
+    });
+  }, []);
 
   // ── Persist to localStorage ───────────────────────────────────────────────
   useEffect(() => {
@@ -147,6 +168,7 @@ const App: React.FC = () => {
 
   /** Apply a merged snapshot back into state. Used after every sync. */
   const applySnapshot = useCallback((data: SyncData) => {
+    setDeletedIds((data.deletedIds ?? {}) as Record<string, number>);
     // A first sync onto a NEW device is the whole point of the feature, and
     // that device is sitting on the onboarding form. Restoring the profile
     // without leaving that form meant the data arrived, was saved, and the
@@ -256,14 +278,16 @@ const App: React.FC = () => {
 
   const handleDeleteLog = (logId: string) => {
     setFoodLogs(prev => prev.filter(log => log.id !== logId));
+    recordDeletion(logId);
   };
 
   const handleResetTodayLog = () => {
     const today = toISODateString();
-    setFoodLogs(prev => prev.filter(log => {
-      if (!log.timestamp) return false;
-      return !isSameISODate(log.timestamp, today);
-    }));
+    setFoodLogs(prev => {
+      const removed = prev.filter(log => !log.timestamp || isSameISODate(log.timestamp, today));
+      recordDeletion(...removed.map(log => log.id));
+      return prev.filter(log => log.timestamp && !isSameISODate(log.timestamp, today));
+    });
   };
 
   // ── Gamification (quest completion forwarded from Dashboard) ──────────────
@@ -344,6 +368,7 @@ const App: React.FC = () => {
 
   const handleDeleteExercise = (id: string) => {
     setExerciseLogs(prev => prev.filter(e => e.id !== id));
+    recordDeletion(id);
   };
 
   // ── Favourites ────────────────────────────────────────────────────────────
@@ -354,6 +379,7 @@ const App: React.FC = () => {
 
   const handleDeleteRecipe = (id: string) => {
     setRecipes(prev => prev.filter(r => r.id !== id));
+    recordDeletion(id);
   };
 
   const handleAddFavourite = (food: FoodItem) => {
@@ -366,6 +392,7 @@ const App: React.FC = () => {
 
   const handleRemoveFavourite = (foodId: string) => {
     setFavouriteFoods(prev => prev.filter(f => f.id !== foodId));
+    recordDeletion(foodId);
   };
 
   const handleQuickAddFavourite = (food: FoodItem, mealType: MealType) => {

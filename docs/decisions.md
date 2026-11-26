@@ -307,6 +307,13 @@ browsers never send to a server, so the key does not transit even during setup.
 - **Progression merges upward.** XP, level, streak and badges take the maximum
   or the union, never the newer value, so syncing can only ever add to what was
   earned.
+- **Deletions need tombstones, and a union merge without them is destructive.**
+  Shipped without. Deleting a meal on one device left the other device's copy
+  intact, so the next merge restored it and pushed it back: the deletion was
+  undone on BOTH devices. Deleted ids are now recorded with a timestamp,
+  carried in the blob, and applied after the union. They expire with the stored
+  row at 90 days. Every add mints a fresh id, so a tombstone can never block
+  re-adding the same thing.
 
 **Reverse this if** sharing with a clinician becomes the point. That needs
 server-readable data and therefore real accounts, and it is a different product

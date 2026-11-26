@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeSyncData, SyncData, SyncEnvelope } from './syncMerge';
+import { mergeSyncData, mergeTombstones, SyncData, SyncEnvelope } from './syncMerge';
 
 const log = (id: string, name: string, timestamp = 1000) => ({
   id, timestamp, type: 'Lunch', food: { id: `f-${id}`, name, calories: 300 },
@@ -143,5 +143,84 @@ describe('degenerate inputs', () => {
     const local = { foodLogs: 'not an array' } as unknown as SyncData;
     const remote = envelope({ foodLogs: null as unknown as unknown[] }, 2000);
     expect(mergeSyncData(local, remote, 1000).data.foodLogs).toEqual([]);
+  });
+});
+
+describe('deletions actually delete', () => {
+  // Real epoch milliseconds. Small numbers like 5000 are January 1970, which
+  // the 90-day tombstone prune correctly discards — the first version of these
+  // tests failed for exactly that reason.
+  const NOW = Date.now();
+  const RECENT = NOW - 60_000;        // an entry logged a minute ago
+  const DELETED_AT = NOW - 30_000;    // deleted after it was logged
+  const LATER = NOW - 1_000;          // touched after the deletion
+
+  it('does not resurrect an entry the other device still has', () => {
+    // THE bug: laptop deletes lunch, phone's last snapshot still contains it,
+    // union restores it and pushes it back — deleted on neither device.
+    const local: SyncData = { foodLogs: [log('b', 'Dinner', RECENT)], deletedIds: { a: DELETED_AT } };
+    const remote = envelope({ foodLogs: [log('a', 'Deleted lunch', RECENT), log('b', 'Dinner', RECENT)] }, 2000);
+
+    const ids = (mergeSyncData(local, remote, 1000).data.foodLogs as { id: string }[]).map((l) => l.id);
+    expect(ids).toEqual(['b']);
+  });
+
+  it('propagates a deletion made on the OTHER device', () => {
+    // Phone deleted it; this laptop still has it and must let it go.
+    const local: SyncData = { foodLogs: [log('a', 'Lunch', RECENT), log('b', 'Dinner', RECENT)] };
+    const remote = envelope({ foodLogs: [log('b', 'Dinner', RECENT)], deletedIds: { a: DELETED_AT } }, 2000);
+
+    const ids = (mergeSyncData(local, remote, 1000).data.foodLogs as { id: string }[]).map((l) => l.id);
+    expect(ids).toEqual(['b']);
+  });
+
+  it('carries the tombstones forward so the next sync still honours them', () => {
+    const local: SyncData = { foodLogs: [], deletedIds: { a: DELETED_AT } };
+    const merged = mergeSyncData(local, envelope({ foodLogs: [log('a', 'Zombie', RECENT)] }, 2000), 1000);
+    expect(merged.data.deletedIds).toMatchObject({ a: DELETED_AT });
+    // Feeding the result back in must not let it return either.
+    const again = mergeSyncData(merged.data, envelope({ foodLogs: [log('a', 'Zombie', RECENT)] }, 3000), 2000);
+    expect(again.data.foodLogs).toHaveLength(0);
+  });
+
+  it('applies to every id-keyed list, not just food', () => {
+    const local: SyncData = {
+      exerciseLogs: [], recipes: [], favouriteFoods: [],
+      deletedIds: { e1: DELETED_AT, r1: DELETED_AT, f1: DELETED_AT },
+    };
+    const remote = envelope({
+      exerciseLogs: [{ id: 'e1', timestamp: RECENT }],
+      recipes: [{ id: 'r1', timestamp: RECENT }],
+      favouriteFoods: [{ id: 'f1' }],
+    }, 2000);
+    const { data } = mergeSyncData(local, remote, 1000);
+    expect(data.exerciseLogs).toHaveLength(0);
+    expect(data.recipes).toHaveLength(0);
+    expect(data.favouriteFoods).toHaveLength(0);
+  });
+
+  it('lets a re-add win, because every add mints a new id', () => {
+    // Re-logging the same meal produces a different id, so the tombstone for
+    // the old one cannot suppress it.
+    const local: SyncData = { foodLogs: [log('a2', 'Lunch again', LATER)], deletedIds: { a1: DELETED_AT } };
+    const { data } = mergeSyncData(local, envelope({ foodLogs: [log('a1', 'Old lunch', RECENT)] }, 2000), 1000);
+    expect((data.foodLogs as { id: string }[]).map((l) => l.id)).toEqual(['a2']);
+  });
+
+  it('keeps an entry whose own timestamp is newer than the deletion', () => {
+    const local: SyncData = { foodLogs: [log('a', 'Edited after delete', LATER)], deletedIds: { a: DELETED_AT } };
+    expect(mergeSyncData(local, envelope({}, 2000), 1000).data.foodLogs).toHaveLength(1);
+  });
+
+  it('forgets tombstones older than the row they protect', () => {
+    const ancient = Date.now() - 91 * 24 * 60 * 60 * 1000;
+    const merged = mergeTombstones({ old: ancient, fresh: Date.now() }, {});
+    expect(merged.old).toBeUndefined();
+    expect(merged.fresh).toBeDefined();
+  });
+
+  it('takes the later of two deletions of the same id', () => {
+    expect(mergeTombstones({ a: DELETED_AT }, { a: LATER })).toEqual({ a: LATER });
+    expect(mergeTombstones({ a: LATER }, { a: DELETED_AT })).toEqual({ a: LATER });
   });
 });

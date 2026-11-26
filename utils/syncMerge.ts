@@ -30,6 +30,14 @@ export interface SyncData {
   exerciseLogs?: unknown[];
   recipes?: unknown[];
   weightGoal?: unknown;
+  /**
+   * Ids this user has deleted, and when. See mergeTombstones.
+   *
+   * Without these a union merge is actively destructive: the other device
+   * still holds the entry you deleted, so the merge faithfully restores it and
+   * pushes it back — your deletion is undone on BOTH devices.
+   */
+  deletedIds?: Record<string, number>;
 }
 
 export interface SyncEnvelope {
@@ -38,6 +46,33 @@ export interface SyncEnvelope {
   syncedAt: number;
   data: SyncData;
 }
+
+/**
+ * Tombstones expire with the stored row (90 days).
+ *
+ * Keeping them forever would grow the blob without limit. The risk of dropping
+ * one is that a device which has been offline for over 90 days could resurrect
+ * a deleted entry — by then it has long since synced, and an unbounded list is
+ * the worse failure.
+ */
+const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Union of both devices' deletions, latest wins, expired ones dropped. */
+export const mergeTombstones = (
+  a: Record<string, number> | undefined,
+  b: Record<string, number> | undefined,
+  now: number = Date.now(),
+): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const source of [a ?? {}, b ?? {}]) {
+    for (const [id, at] of Object.entries(source)) {
+      const when = Number(at) || 0;
+      if (now - when > TOMBSTONE_TTL_MS) continue;
+      if (!out[id] || when > out[id]) out[id] = when;
+    }
+  }
+  return out;
+};
 
 const asArray = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
@@ -100,10 +135,25 @@ export const mergeSyncData = (
   const remoteIsNewer = Number(remote.syncedAt) > Number(localSyncedAt);
   const r = remote.data;
 
-  const foodLogs = unionBy('id', local.foodLogs, r.foodLogs, newerByTimestamp);
-  const exerciseLogs = unionBy('id', local.exerciseLogs, r.exerciseLogs, newerByTimestamp);
-  const recipes = unionBy('id', local.recipes, r.recipes, newerByTimestamp);
-  const favouriteFoods = unionBy('id', local.favouriteFoods, r.favouriteFoods, keepFirst);
+  const deletedIds = mergeTombstones(local.deletedIds, r.deletedIds);
+
+  /**
+   * Drop anything either device has deleted.
+   *
+   * Applied AFTER the union, because the union is what resurrects it. An entry
+   * survives its own tombstone only if it was touched after the deletion —
+   * which in practice never happens, since every add mints a fresh id.
+   */
+  const alive = (rows: Record<string, unknown>[]) =>
+    rows.filter((row) => {
+      const deletedAt = deletedIds[String(row.id)];
+      return deletedAt === undefined || timeOf(row) > deletedAt;
+    });
+
+  const foodLogs = alive(unionBy('id', local.foodLogs, r.foodLogs, newerByTimestamp));
+  const exerciseLogs = alive(unionBy('id', local.exerciseLogs, r.exerciseLogs, newerByTimestamp));
+  const recipes = alive(unionBy('id', local.recipes, r.recipes, newerByTimestamp));
+  const favouriteFoods = alive(unionBy('id', local.favouriteFoods, r.favouriteFoods, keepFirst));
   const weightHistory = unionBy('date', local.weightHistory, r.weightHistory, keepFirst)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
@@ -136,6 +186,7 @@ export const mergeSyncData = (
         Number(r.lifetimeQuestsCompleted) || 0,
       ),
       foodLogs, exerciseLogs, recipes, favouriteFoods, weightHistory,
+      deletedIds,
     },
     summary: { added: Math.max(0, added), fromRemote: true },
   };
